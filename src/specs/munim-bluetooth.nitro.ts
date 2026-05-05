@@ -255,6 +255,9 @@ export interface MunimBluetooth
     characteristicUUID: string
   ): void
 
+
+  notifyCharacteristic(serviceUUID: string, characteristicUUID: string, value: string): Promise<void>;
+
   /**
    * Get list of currently connected devices.
    *
@@ -299,4 +302,5 @@ export interface MunimBluetooth
    * @param count - Number of listeners to remove.
    */
   removeListeners(count: number): void
+
 }

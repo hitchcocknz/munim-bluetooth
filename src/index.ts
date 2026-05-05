@@ -48,18 +48,10 @@ if (Platform.OS === 'android') {
     eventEmitter = new NativeEventEmitter(nativeEventModule)
     console.log('[munim-bluetooth] Event emitter initialized successfully')
   } catch (error) {
-    console.error(
-      '[munim-bluetooth] Failed to initialize event emitter:',
-      error
-    )
+    console.error('[munim-bluetooth] Failed to initialize event emitter:', error)
   }
 } else {
-  console.warn(
-    '[munim-bluetooth] Event emitter module not found in NativeModules - device discovery events will not work'
-  )
-  console.warn(
-    '[munim-bluetooth] This usually means the native module was not linked properly or needs a rebuild'
-  )
+  console.warn('[munim-bluetooth] Event emitter module not found in NativeModules')
 }
 
 // ========== Peripheral Features ==========
@@ -226,6 +218,22 @@ export function writeCharacteristic(
 }
 
 /**
+ * Notify subscribed centrals of a characteristic value change (peripheral role).
+ *
+ * @param serviceUUID - The UUID of the service containing the characteristic.
+ * @param characteristicUUID - The UUID of the characteristic to notify on.
+ * @param value - The value to send to subscribed centrals.
+ * @returns Promise resolving when notification is sent.
+ */
+export function notifyCharacteristic(
+  serviceUUID: string,
+  characteristicUUID: string,
+  value: string
+): Promise<void> {
+  return MunimBluetooth.notifyCharacteristic(serviceUUID, characteristicUUID, value)
+}
+
+/**
  * Subscribe to notifications/indications from a characteristic.
  *
  * @param deviceId - The unique identifier of the connected device.
@@ -382,6 +390,7 @@ export default {
   updateAdvertisingData,
   getAdvertisingData,
   setServices,
+  notifyCharacteristic,
   // Central
   isBluetoothEnabled,
   requestBluetoothPermission,

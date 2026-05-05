@@ -208,6 +208,14 @@ namespace margelo::nitro::munimbluetooth {
         std::rethrow_exception(__result.error());
       }
     }
+    inline std::shared_ptr<Promise<void>> notifyCharacteristic(const std::string& serviceUUID, const std::string& characteristicUUID, const std::string& value) override {
+      auto __result = _swiftPart.notifyCharacteristic(serviceUUID, characteristicUUID, value);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
     inline std::shared_ptr<Promise<std::vector<std::string>>> getConnectedDevices() override {
       auto __result = _swiftPart.getConnectedDevices();
       if (__result.hasError()) [[unlikely]] {
