@@ -47,6 +47,7 @@ namespace margelo::nitro::munimbluetooth { struct BackgroundSessionOptions; }
 #include "CharacteristicValue.hpp"
 #include "WriteType.hpp"
 #include "BackgroundSessionOptions.hpp"
+#include <functional>
 
 #include "MunimBluetooth-Swift-Cxx-Umbrella.hpp"
 
@@ -243,6 +244,38 @@ namespace margelo::nitro::munimbluetooth {
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
+    }
+    inline std::function<void()> onDeviceConnected(const std::function<void(const std::string& /* deviceId */)>& callback) override {
+      auto __result = _swiftPart.onDeviceConnected(callback);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::function<void()> onDeviceDisconnected(const std::function<void(const std::string& /* deviceId */)>& callback) override {
+      auto __result = _swiftPart.onDeviceDisconnected(callback);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::function<void()> onCharacteristicValueChanged(const std::function<void(const std::string& /* deviceId */, const std::string& /* serviceUUID */, const std::string& /* characteristicUUID */, const std::string& /* value */)>& callback) override {
+      auto __result = _swiftPart.onCharacteristicValueChanged(callback);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::function<void()> onPeripheralStateChanged(const std::function<void(const std::string& /* state */)>& callback) override {
+      auto __result = _swiftPart.onPeripheralStateChanged(callback);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
     }
     inline void addListener(const std::string& eventName) override {
       auto __result = _swiftPart.addListener(eventName);

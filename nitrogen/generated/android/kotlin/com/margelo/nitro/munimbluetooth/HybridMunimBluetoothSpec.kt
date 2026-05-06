@@ -113,6 +113,42 @@ abstract class HybridMunimBluetoothSpec: HybridObject() {
   @Keep
   abstract fun stopBackgroundSession(): Unit
   
+  abstract fun onDeviceConnected(callback: (deviceId: String) -> Unit): () -> Unit
+  
+  @DoNotStrip
+  @Keep
+  private fun onDeviceConnected_cxx(callback: Func_void_std__string): Func_void {
+    val __result = onDeviceConnected(callback)
+    return Func_void_java(__result)
+  }
+  
+  abstract fun onDeviceDisconnected(callback: (deviceId: String) -> Unit): () -> Unit
+  
+  @DoNotStrip
+  @Keep
+  private fun onDeviceDisconnected_cxx(callback: Func_void_std__string): Func_void {
+    val __result = onDeviceDisconnected(callback)
+    return Func_void_java(__result)
+  }
+  
+  abstract fun onCharacteristicValueChanged(callback: (deviceId: String, serviceUUID: String, characteristicUUID: String, value: String) -> Unit): () -> Unit
+  
+  @DoNotStrip
+  @Keep
+  private fun onCharacteristicValueChanged_cxx(callback: Func_void_std__string_std__string_std__string_std__string): Func_void {
+    val __result = onCharacteristicValueChanged(callback)
+    return Func_void_java(__result)
+  }
+  
+  abstract fun onPeripheralStateChanged(callback: (state: String) -> Unit): () -> Unit
+  
+  @DoNotStrip
+  @Keep
+  private fun onPeripheralStateChanged_cxx(callback: Func_void_std__string): Func_void {
+    val __result = onPeripheralStateChanged(callback)
+    return Func_void_java(__result)
+  }
+  
   @DoNotStrip
   @Keep
   abstract fun addListener(eventName: String): Unit

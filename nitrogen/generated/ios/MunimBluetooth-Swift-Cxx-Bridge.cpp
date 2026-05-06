@@ -78,6 +78,22 @@ namespace margelo::nitro::munimbluetooth::bridge::swift {
     };
   }
   
+  // pragma MARK: std::function<void(const std::string& /* deviceId */)>
+  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = MunimBluetooth::Func_void_std__string::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::string& deviceId) mutable -> void {
+      swiftClosure.call(deviceId);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const std::string& /* deviceId */, const std::string& /* serviceUUID */, const std::string& /* characteristicUUID */, const std::string& /* value */)>
+  Func_void_std__string_std__string_std__string_std__string create_Func_void_std__string_std__string_std__string_std__string(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = MunimBluetooth::Func_void_std__string_std__string_std__string_std__string::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID, const std::string& value) mutable -> void {
+      swiftClosure.call(deviceId, serviceUUID, characteristicUUID, value);
+    };
+  }
+  
   // pragma MARK: std::shared_ptr<HybridMunimBluetoothSpec>
   std::shared_ptr<HybridMunimBluetoothSpec> create_std__shared_ptr_HybridMunimBluetoothSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
     MunimBluetooth::HybridMunimBluetoothSpec_cxx swiftPart = MunimBluetooth::HybridMunimBluetoothSpec_cxx::fromUnsafe(swiftUnsafePointer);

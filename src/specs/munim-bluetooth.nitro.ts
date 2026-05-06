@@ -109,8 +109,8 @@ export interface BackgroundSessionOptions {
 
 export interface MunimBluetooth
   extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
-  // ========== Peripheral Features ==========
 
+  // ========== Peripheral Features ==========
   /**
    * Start advertising as a Bluetooth peripheral with supported advertising data.
    *
@@ -288,6 +288,12 @@ export interface MunimBluetooth
   stopBackgroundSession(): void
 
   // ========== Event Management ==========
+  
+  // Event callbacks — peripheral role
+  onDeviceConnected(callback: (deviceId: string) => void): () => void;
+  onDeviceDisconnected(callback: (deviceId: string) => void): () => void;
+  onCharacteristicValueChanged(callback: (deviceId: string, serviceUUID: string, characteristicUUID: string, value: string) => void): () => void;
+  onPeripheralStateChanged(callback: (state: string) => void): () => void;
 
   /**
    * Add an event listener.

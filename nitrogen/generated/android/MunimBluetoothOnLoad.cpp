@@ -16,6 +16,9 @@
 #include <NitroModules/HybridObjectRegistry.hpp>
 
 #include "JHybridMunimBluetoothSpec.hpp"
+#include "JFunc_void.hpp"
+#include "JFunc_void_std__string.hpp"
+#include "JFunc_void_std__string_std__string_std__string_std__string.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
 
 namespace margelo::nitro::munimbluetooth {
@@ -41,6 +44,9 @@ void registerAllNatives() {
 
   // Register native JNI methods
   margelo::nitro::munimbluetooth::JHybridMunimBluetoothSpec::CxxPart::registerNatives();
+  margelo::nitro::munimbluetooth::JFunc_void_cxx::registerNatives();
+  margelo::nitro::munimbluetooth::JFunc_void_std__string_cxx::registerNatives();
+  margelo::nitro::munimbluetooth::JFunc_void_std__string_std__string_std__string_std__string_cxx::registerNatives();
 
   // Register Nitro Hybrid Objects
   HybridObjectRegistry::registerHybridObjectConstructor(

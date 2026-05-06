@@ -496,6 +496,50 @@ namespace margelo::nitro::munimbluetooth::bridge::swift {
     return Func_void_double_Wrapper(std::move(value));
   }
   
+  // pragma MARK: std::function<void(const std::string& /* deviceId */)>
+  /**
+   * Specialized version of `std::function<void(const std::string&)>`.
+   */
+  using Func_void_std__string = std::function<void(const std::string& /* deviceId */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::string& / * deviceId * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__string_Wrapper final {
+  public:
+    explicit Func_void_std__string_Wrapper(std::function<void(const std::string& /* deviceId */)>&& func): _function(std::make_unique<std::function<void(const std::string& /* deviceId */)>>(std::move(func))) {}
+    inline void call(std::string deviceId) const noexcept {
+      _function->operator()(deviceId);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::string& /* deviceId */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__string_Wrapper wrap_Func_void_std__string(Func_void_std__string value) noexcept {
+    return Func_void_std__string_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::function<void(const std::string& /* deviceId */, const std::string& /* serviceUUID */, const std::string& /* characteristicUUID */, const std::string& /* value */)>
+  /**
+   * Specialized version of `std::function<void(const std::string&, const std::string&, const std::string&, const std::string&)>`.
+   */
+  using Func_void_std__string_std__string_std__string_std__string = std::function<void(const std::string& /* deviceId */, const std::string& /* serviceUUID */, const std::string& /* characteristicUUID */, const std::string& /* value */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::string& / * deviceId * /, const std::string& / * serviceUUID * /, const std::string& / * characteristicUUID * /, const std::string& / * value * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__string_std__string_std__string_std__string_Wrapper final {
+  public:
+    explicit Func_void_std__string_std__string_std__string_std__string_Wrapper(std::function<void(const std::string& /* deviceId */, const std::string& /* serviceUUID */, const std::string& /* characteristicUUID */, const std::string& /* value */)>&& func): _function(std::make_unique<std::function<void(const std::string& /* deviceId */, const std::string& /* serviceUUID */, const std::string& /* characteristicUUID */, const std::string& /* value */)>>(std::move(func))) {}
+    inline void call(std::string deviceId, std::string serviceUUID, std::string characteristicUUID, std::string value) const noexcept {
+      _function->operator()(deviceId, serviceUUID, characteristicUUID, value);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::string& /* deviceId */, const std::string& /* serviceUUID */, const std::string& /* characteristicUUID */, const std::string& /* value */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__string_std__string_std__string_std__string create_Func_void_std__string_std__string_std__string_std__string(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__string_std__string_std__string_std__string_Wrapper wrap_Func_void_std__string_std__string_std__string_std__string(Func_void_std__string_std__string_std__string_std__string value) noexcept {
+    return Func_void_std__string_std__string_std__string_std__string_Wrapper(std::move(value));
+  }
+  
   // pragma MARK: std::shared_ptr<HybridMunimBluetoothSpec>
   /**
    * Specialized version of `std::shared_ptr<HybridMunimBluetoothSpec>`.
@@ -578,6 +622,15 @@ namespace margelo::nitro::munimbluetooth::bridge::swift {
   }
   inline Result_std__shared_ptr_Promise_double___ create_Result_std__shared_ptr_Promise_double___(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<Promise<double>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::function<void()>>
+  using Result_std__function_void____ = Result<std::function<void()>>;
+  inline Result_std__function_void____ create_Result_std__function_void____(const std::function<void()>& value) noexcept {
+    return Result<std::function<void()>>::withValue(value);
+  }
+  inline Result_std__function_void____ create_Result_std__function_void____(const std::exception_ptr& error) noexcept {
+    return Result<std::function<void()>>::withError(error);
   }
 
 } // namespace margelo::nitro::munimbluetooth::bridge::swift

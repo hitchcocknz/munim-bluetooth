@@ -39,6 +39,7 @@ namespace margelo::nitro::munimbluetooth { struct BackgroundSessionOptions; }
 #include "CharacteristicValue.hpp"
 #include "WriteType.hpp"
 #include "BackgroundSessionOptions.hpp"
+#include <functional>
 
 namespace margelo::nitro::munimbluetooth {
 
@@ -92,6 +93,10 @@ namespace margelo::nitro::munimbluetooth {
       virtual std::shared_ptr<Promise<double>> readRSSI(const std::string& deviceId) = 0;
       virtual void startBackgroundSession(const BackgroundSessionOptions& options) = 0;
       virtual void stopBackgroundSession() = 0;
+      virtual std::function<void()> onDeviceConnected(const std::function<void(const std::string& /* deviceId */)>& callback) = 0;
+      virtual std::function<void()> onDeviceDisconnected(const std::function<void(const std::string& /* deviceId */)>& callback) = 0;
+      virtual std::function<void()> onCharacteristicValueChanged(const std::function<void(const std::string& /* deviceId */, const std::string& /* serviceUUID */, const std::string& /* characteristicUUID */, const std::string& /* value */)>& callback) = 0;
+      virtual std::function<void()> onPeripheralStateChanged(const std::function<void(const std::string& /* state */)>& callback) = 0;
       virtual void addListener(const std::string& eventName) = 0;
       virtual void removeListeners(double count) = 0;
 

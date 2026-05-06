@@ -34,6 +34,10 @@ public protocol HybridMunimBluetoothSpec_protocol: HybridObject {
   func readRSSI(deviceId: String) throws -> Promise<Double>
   func startBackgroundSession(options: BackgroundSessionOptions) throws -> Void
   func stopBackgroundSession() throws -> Void
+  func onDeviceConnected(callback: @escaping (_ deviceId: String) -> Void) throws -> () -> Void
+  func onDeviceDisconnected(callback: @escaping (_ deviceId: String) -> Void) throws -> () -> Void
+  func onCharacteristicValueChanged(callback: @escaping (_ deviceId: String, _ serviceUUID: String, _ characteristicUUID: String, _ value: String) -> Void) throws -> () -> Void
+  func onPeripheralStateChanged(callback: @escaping (_ state: String) -> Void) throws -> () -> Void
   func addListener(eventName: String) throws -> Void
   func removeListeners(count: Double) throws -> Void
 }

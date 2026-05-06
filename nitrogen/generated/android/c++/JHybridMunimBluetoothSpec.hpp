@@ -75,6 +75,10 @@ namespace margelo::nitro::munimbluetooth {
     std::shared_ptr<Promise<double>> readRSSI(const std::string& deviceId) override;
     void startBackgroundSession(const BackgroundSessionOptions& options) override;
     void stopBackgroundSession() override;
+    std::function<void()> onDeviceConnected(const std::function<void(const std::string& /* deviceId */)>& callback) override;
+    std::function<void()> onDeviceDisconnected(const std::function<void(const std::string& /* deviceId */)>& callback) override;
+    std::function<void()> onCharacteristicValueChanged(const std::function<void(const std::string& /* deviceId */, const std::string& /* serviceUUID */, const std::string& /* characteristicUUID */, const std::string& /* value */)>& callback) override;
+    std::function<void()> onPeripheralStateChanged(const std::function<void(const std::string& /* state */)>& callback) override;
     void addListener(const std::string& eventName) override;
     void removeListeners(double count) override;
 

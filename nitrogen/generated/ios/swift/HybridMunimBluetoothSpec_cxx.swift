@@ -448,6 +448,86 @@ open class HybridMunimBluetoothSpec_cxx {
   }
   
   @inline(__always)
+  public final func onDeviceConnected(callback: bridge.Func_void_std__string) -> bridge.Result_std__function_void____ {
+    do {
+      let __result = try self.__implementation.onDeviceConnected(callback: { () -> (String) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_std__string(callback)
+        return { (__deviceId: String) -> Void in
+          __wrappedFunction.call(std.string(__deviceId))
+        }
+      }())
+      let __resultCpp = { () -> bridge.Func_void in
+        let __closureWrapper = Func_void(__result)
+        return bridge.create_Func_void(__closureWrapper.toUnsafe())
+      }()
+      return bridge.create_Result_std__function_void____(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__function_void____(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func onDeviceDisconnected(callback: bridge.Func_void_std__string) -> bridge.Result_std__function_void____ {
+    do {
+      let __result = try self.__implementation.onDeviceDisconnected(callback: { () -> (String) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_std__string(callback)
+        return { (__deviceId: String) -> Void in
+          __wrappedFunction.call(std.string(__deviceId))
+        }
+      }())
+      let __resultCpp = { () -> bridge.Func_void in
+        let __closureWrapper = Func_void(__result)
+        return bridge.create_Func_void(__closureWrapper.toUnsafe())
+      }()
+      return bridge.create_Result_std__function_void____(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__function_void____(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func onCharacteristicValueChanged(callback: bridge.Func_void_std__string_std__string_std__string_std__string) -> bridge.Result_std__function_void____ {
+    do {
+      let __result = try self.__implementation.onCharacteristicValueChanged(callback: { () -> (String, String, String, String) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_std__string_std__string_std__string_std__string(callback)
+        return { (__deviceId: String, __serviceUUID: String, __characteristicUUID: String, __value: String) -> Void in
+          __wrappedFunction.call(std.string(__deviceId), std.string(__serviceUUID), std.string(__characteristicUUID), std.string(__value))
+        }
+      }())
+      let __resultCpp = { () -> bridge.Func_void in
+        let __closureWrapper = Func_void(__result)
+        return bridge.create_Func_void(__closureWrapper.toUnsafe())
+      }()
+      return bridge.create_Result_std__function_void____(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__function_void____(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func onPeripheralStateChanged(callback: bridge.Func_void_std__string) -> bridge.Result_std__function_void____ {
+    do {
+      let __result = try self.__implementation.onPeripheralStateChanged(callback: { () -> (String) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_std__string(callback)
+        return { (__state: String) -> Void in
+          __wrappedFunction.call(std.string(__state))
+        }
+      }())
+      let __resultCpp = { () -> bridge.Func_void in
+        let __closureWrapper = Func_void(__result)
+        return bridge.create_Func_void(__closureWrapper.toUnsafe())
+      }()
+      return bridge.create_Result_std__function_void____(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__function_void____(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
   public final func addListener(eventName: std.string) -> bridge.Result_void_ {
     do {
       try self.__implementation.addListener(eventName: String(eventName))

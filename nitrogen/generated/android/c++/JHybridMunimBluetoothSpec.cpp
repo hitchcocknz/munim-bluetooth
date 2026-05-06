@@ -44,6 +44,9 @@ namespace margelo::nitro::munimbluetooth { struct BackgroundSessionOptions; }
 #include "JGATTCharacteristic.hpp"
 #include "CharacteristicValue.hpp"
 #include "JCharacteristicValue.hpp"
+#include <functional>
+#include "JFunc_void.hpp"
+#include <NitroModules/JNICallable.hpp>
 #include "AdvertisingOptions.hpp"
 #include "JAdvertisingOptions.hpp"
 #include "ScanOptions.hpp"
@@ -54,6 +57,8 @@ namespace margelo::nitro::munimbluetooth { struct BackgroundSessionOptions; }
 #include "JWriteType.hpp"
 #include "BackgroundSessionOptions.hpp"
 #include "JBackgroundSessionOptions.hpp"
+#include "JFunc_void_std__string.hpp"
+#include "JFunc_void_std__string_std__string_std__string_std__string.hpp"
 
 namespace margelo::nitro::munimbluetooth {
 
@@ -315,6 +320,58 @@ namespace margelo::nitro::munimbluetooth {
   void JHybridMunimBluetoothSpec::stopBackgroundSession() {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("stopBackgroundSession");
     method(_javaPart);
+  }
+  std::function<void()> JHybridMunimBluetoothSpec::onDeviceConnected(const std::function<void(const std::string& /* deviceId */)>& callback) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JFunc_void::javaobject>(jni::alias_ref<JFunc_void_std__string::javaobject> /* callback */)>("onDeviceConnected_cxx");
+    auto __result = method(_javaPart, JFunc_void_std__string_cxx::fromCpp(callback));
+    return [&]() -> std::function<void()> {
+      if (__result->isInstanceOf(JFunc_void_cxx::javaClassStatic())) [[likely]] {
+        auto downcast = jni::static_ref_cast<JFunc_void_cxx::javaobject>(__result);
+        return downcast->cthis()->getFunction();
+      } else {
+        auto __resultRef = jni::make_global(__result);
+        return JNICallable<JFunc_void, void()>(std::move(__resultRef));
+      }
+    }();
+  }
+  std::function<void()> JHybridMunimBluetoothSpec::onDeviceDisconnected(const std::function<void(const std::string& /* deviceId */)>& callback) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JFunc_void::javaobject>(jni::alias_ref<JFunc_void_std__string::javaobject> /* callback */)>("onDeviceDisconnected_cxx");
+    auto __result = method(_javaPart, JFunc_void_std__string_cxx::fromCpp(callback));
+    return [&]() -> std::function<void()> {
+      if (__result->isInstanceOf(JFunc_void_cxx::javaClassStatic())) [[likely]] {
+        auto downcast = jni::static_ref_cast<JFunc_void_cxx::javaobject>(__result);
+        return downcast->cthis()->getFunction();
+      } else {
+        auto __resultRef = jni::make_global(__result);
+        return JNICallable<JFunc_void, void()>(std::move(__resultRef));
+      }
+    }();
+  }
+  std::function<void()> JHybridMunimBluetoothSpec::onCharacteristicValueChanged(const std::function<void(const std::string& /* deviceId */, const std::string& /* serviceUUID */, const std::string& /* characteristicUUID */, const std::string& /* value */)>& callback) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JFunc_void::javaobject>(jni::alias_ref<JFunc_void_std__string_std__string_std__string_std__string::javaobject> /* callback */)>("onCharacteristicValueChanged_cxx");
+    auto __result = method(_javaPart, JFunc_void_std__string_std__string_std__string_std__string_cxx::fromCpp(callback));
+    return [&]() -> std::function<void()> {
+      if (__result->isInstanceOf(JFunc_void_cxx::javaClassStatic())) [[likely]] {
+        auto downcast = jni::static_ref_cast<JFunc_void_cxx::javaobject>(__result);
+        return downcast->cthis()->getFunction();
+      } else {
+        auto __resultRef = jni::make_global(__result);
+        return JNICallable<JFunc_void, void()>(std::move(__resultRef));
+      }
+    }();
+  }
+  std::function<void()> JHybridMunimBluetoothSpec::onPeripheralStateChanged(const std::function<void(const std::string& /* state */)>& callback) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JFunc_void::javaobject>(jni::alias_ref<JFunc_void_std__string::javaobject> /* callback */)>("onPeripheralStateChanged_cxx");
+    auto __result = method(_javaPart, JFunc_void_std__string_cxx::fromCpp(callback));
+    return [&]() -> std::function<void()> {
+      if (__result->isInstanceOf(JFunc_void_cxx::javaClassStatic())) [[likely]] {
+        auto downcast = jni::static_ref_cast<JFunc_void_cxx::javaobject>(__result);
+        return downcast->cthis()->getFunction();
+      } else {
+        auto __resultRef = jni::make_global(__result);
+        return JNICallable<JFunc_void, void()>(std::move(__resultRef));
+      }
+    }();
   }
   void JHybridMunimBluetoothSpec::addListener(const std::string& eventName) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* eventName */)>("addListener");

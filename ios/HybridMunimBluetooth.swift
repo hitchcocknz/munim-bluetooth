@@ -114,6 +114,9 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
     private var peripheralManager: CBPeripheralManager?
     private var peripheralServices: [CBMutableService] = []
     private var currentAdvertisingData: AdvertisingDataTypes?
+    private var onDeviceDisconnectedCallback: ((_ deviceId: String) -> Void)?
+    private var onCharacteristicValueChangedCallback: ((_ deviceId: String, _ serviceUUID: String, _ characteristicUUID: String, _ value: String) -> Void)?
+    private var onPeripheralStateChangedCallback: ((_ state: String) -> Void)?
     
     // Central Manager
     private var centralManager: CBCentralManager?
@@ -132,6 +135,7 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
     private lazy var centralManagerDelegateProxy = CentralManagerDelegateProxy(owner: self)
     private lazy var peripheralDelegateProxy = PeripheralDelegateProxy(owner: self)
     private var connectedCentrals: [String: CBCentral] = [:]
+    private var onDeviceConnectedCallback: ((_ deviceId: String) -> Void)?
     
     override init() {
         super.init()
@@ -151,6 +155,35 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
         )
     }
     
+    // SHANE: - Event Callbacks
+    func onDeviceConnected(callback: @escaping (_ deviceId: String) -> Void) -> (() -> Void) {
+        onDeviceConnectedCallback = callback
+        return { [weak self] in
+            self?.onDeviceConnectedCallback = nil
+        }
+    }
+
+    func onDeviceDisconnected(callback: @escaping (_ deviceId: String) -> Void) -> (() -> Void) {
+        onDeviceDisconnectedCallback = callback
+        return { [weak self] in
+            self?.onDeviceDisconnectedCallback = nil
+        }
+    }
+
+    func onCharacteristicValueChanged(callback: @escaping (_ deviceId: String, _ serviceUUID: String, _ characteristicUUID: String, _ value: String) -> Void) -> (() -> Void) {
+        onCharacteristicValueChangedCallback = callback
+        return { [weak self] in
+            self?.onCharacteristicValueChangedCallback = nil
+        }
+    }
+
+    func onPeripheralStateChanged(callback: @escaping (_ state: String) -> Void) -> (() -> Void) {
+        onPeripheralStateChangedCallback = callback
+        return { [weak self] in
+            self?.onPeripheralStateChangedCallback = nil
+        }
+    }
+
     // MARK: - Event Emission
     private func emitDeviceFound(device: CBPeripheral, advertisementData: [String: Any], rssi: NSNumber) {
         // Build device data dictionary
@@ -640,19 +673,18 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
         }
     }
 
-
     func handleCentralDidSubscribe(_ peripheral: CBPeripheralManager, central: CBCentral, characteristic: CBCharacteristic) {
         let centralId = central.identifier.uuidString
         connectedCentrals[centralId] = central
         NSLog("[MunimBluetooth] Central subscribed: %@", centralId)
-        MunimBluetoothEventEmitter.emit(eventName: "deviceConnected", body: ["deviceId": centralId])
+        onDeviceConnectedCallback?(centralId)
     }
 
     func handleCentralDidUnsubscribe(_ peripheral: CBPeripheralManager, central: CBCentral, characteristic: CBCharacteristic) {
         let centralId = central.identifier.uuidString
         connectedCentrals.removeValue(forKey: centralId)
         NSLog("[MunimBluetooth] Central unsubscribed: %@", centralId)
-        MunimBluetoothEventEmitter.emit(eventName: "deviceDisconnected", body: ["deviceId": centralId])
+        onDeviceDisconnectedCallback?(centralId)
     }
 
 
@@ -663,19 +695,17 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
             
             let centralId = request.central.identifier.uuidString
             
-            // Only emit deviceConnected if we haven't already seen this central
-            // via handleCentralDidSubscribe — avoids double emission
             if connectedCentrals[centralId] == nil {
                 connectedCentrals[centralId] = request.central
-                MunimBluetoothEventEmitter.emit(eventName: "deviceConnected", body: ["deviceId": centralId])
+                onDeviceConnectedCallback?(centralId)
             }
             
-            MunimBluetoothEventEmitter.emit(eventName: "characteristicValueChanged", body: [
-                "deviceId": centralId,
-                "serviceUUID": request.characteristic.service?.uuid.uuidString ?? "",
-                "characteristicUUID": request.characteristic.uuid.uuidString,
-                "value": text
-            ])
+            onCharacteristicValueChangedCallback?(
+                centralId,
+                request.characteristic.service?.uuid.uuidString ?? "",
+                request.characteristic.uuid.uuidString,
+                text
+            )
             
             peripheral.respond(to: request, withResult: .success)
         }
@@ -782,8 +812,8 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
     }
 
     // MARK: - CoreBluetooth Delegate Forwarding
-    
-   func handlePeripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
+        
+    func handlePeripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
         let stateStr: String
         switch peripheral.state {
         case .poweredOn:    stateStr = "poweredOn"
@@ -795,7 +825,7 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
         @unknown default:   stateStr = "unknown"
         }
         NSLog("[MunimBluetooth] Peripheral manager state: %@", stateStr)
-        MunimBluetoothEventEmitter.emit(eventName: "peripheralStateChanged", body: ["state": stateStr])
+        onPeripheralStateChangedCallback?(stateStr)
     }
 
     func handlePeripheralManagerWillRestoreState(_ peripheral: CBPeripheralManager, state: [String: Any]) {

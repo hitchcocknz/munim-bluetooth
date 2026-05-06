@@ -310,6 +310,25 @@ export function stopBackgroundSession(): void {
 }
 
 // ========== Event Management ==========
+export function onDeviceConnected(callback: (deviceId: string) => void): () => void {
+  MunimBluetooth.onDeviceConnected(callback)
+  return () => MunimBluetooth.onDeviceConnected(() => {}) // clear callback
+}
+
+export function onDeviceDisconnected(callback: (deviceId: string) => void): () => void {
+  MunimBluetooth.onDeviceDisconnected(callback)
+  return () => MunimBluetooth.onDeviceDisconnected(() => {})
+}
+
+export function onCharacteristicValueChanged(callback: (deviceId: string, serviceUUID: string, characteristicUUID: string, value: string) => void): () => void {
+  MunimBluetooth.onCharacteristicValueChanged(callback)
+  return () => MunimBluetooth.onCharacteristicValueChanged(() => {})
+}
+
+export function onPeripheralStateChanged(callback: (state: string) => void): () => void {
+  MunimBluetooth.onPeripheralStateChanged(callback)
+  return () => MunimBluetooth.onPeripheralStateChanged(() => {})
+}
 
 /**
  * Add a device found event listener (for scanning).
