@@ -10,6 +10,8 @@
 // Forward declarations of C++ defined types
 // Forward declaration of `AdvertisingDataTypes` to properly resolve imports.
 namespace margelo::nitro::munimbluetooth { struct AdvertisingDataTypes; }
+// Forward declaration of `BLEDevice` to properly resolve imports.
+namespace margelo::nitro::munimbluetooth { struct BLEDevice; }
 // Forward declaration of `CharacteristicValue` to properly resolve imports.
 namespace margelo::nitro::munimbluetooth { struct CharacteristicValue; }
 // Forward declaration of `GATTCharacteristic` to properly resolve imports.
@@ -33,6 +35,7 @@ namespace MunimBluetooth { class HybridMunimBluetoothSpec_cxx; }
 
 // Include C++ defined types
 #include "AdvertisingDataTypes.hpp"
+#include "BLEDevice.hpp"
 #include "CharacteristicValue.hpp"
 #include "GATTCharacteristic.hpp"
 #include "GATTService.hpp"
@@ -538,6 +541,28 @@ namespace margelo::nitro::munimbluetooth::bridge::swift {
   Func_void_std__string_std__string_std__string_std__string create_Func_void_std__string_std__string_std__string_std__string(void* NON_NULL swiftClosureWrapper) noexcept;
   inline Func_void_std__string_std__string_std__string_std__string_Wrapper wrap_Func_void_std__string_std__string_std__string_std__string(Func_void_std__string_std__string_std__string_std__string value) noexcept {
     return Func_void_std__string_std__string_std__string_std__string_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::function<void(const BLEDevice& /* device */)>
+  /**
+   * Specialized version of `std::function<void(const BLEDevice&)>`.
+   */
+  using Func_void_BLEDevice = std::function<void(const BLEDevice& /* device */)>;
+  /**
+   * Wrapper class for a `std::function<void(const BLEDevice& / * device * /)>`, this can be used from Swift.
+   */
+  class Func_void_BLEDevice_Wrapper final {
+  public:
+    explicit Func_void_BLEDevice_Wrapper(std::function<void(const BLEDevice& /* device */)>&& func): _function(std::make_unique<std::function<void(const BLEDevice& /* device */)>>(std::move(func))) {}
+    inline void call(BLEDevice device) const noexcept {
+      _function->operator()(device);
+    }
+  private:
+    std::unique_ptr<std::function<void(const BLEDevice& /* device */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_BLEDevice create_Func_void_BLEDevice(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_BLEDevice_Wrapper wrap_Func_void_BLEDevice(Func_void_BLEDevice value) noexcept {
+    return Func_void_BLEDevice_Wrapper(std::move(value));
   }
   
   // pragma MARK: std::shared_ptr<HybridMunimBluetoothSpec>

@@ -94,6 +94,14 @@ namespace margelo::nitro::munimbluetooth::bridge::swift {
     };
   }
   
+  // pragma MARK: std::function<void(const BLEDevice& /* device */)>
+  Func_void_BLEDevice create_Func_void_BLEDevice(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = MunimBluetooth::Func_void_BLEDevice::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const BLEDevice& device) mutable -> void {
+      swiftClosure.call(device);
+    };
+  }
+  
   // pragma MARK: std::shared_ptr<HybridMunimBluetoothSpec>
   std::shared_ptr<HybridMunimBluetoothSpec> create_std__shared_ptr_HybridMunimBluetoothSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
     MunimBluetooth::HybridMunimBluetoothSpec_cxx swiftPart = MunimBluetooth::HybridMunimBluetoothSpec_cxx::fromUnsafe(swiftUnsafePointer);

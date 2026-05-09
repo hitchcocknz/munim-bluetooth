@@ -27,6 +27,8 @@ namespace margelo::nitro::munimbluetooth { struct CharacteristicValue; }
 namespace margelo::nitro::munimbluetooth { enum class WriteType; }
 // Forward declaration of `BackgroundSessionOptions` to properly resolve imports.
 namespace margelo::nitro::munimbluetooth { struct BackgroundSessionOptions; }
+// Forward declaration of `BLEDevice` to properly resolve imports.
+namespace margelo::nitro::munimbluetooth { struct BLEDevice; }
 
 #include "AdvertisingOptions.hpp"
 #include "AdvertisingDataTypes.hpp"
@@ -40,6 +42,7 @@ namespace margelo::nitro::munimbluetooth { struct BackgroundSessionOptions; }
 #include "WriteType.hpp"
 #include "BackgroundSessionOptions.hpp"
 #include <functional>
+#include "BLEDevice.hpp"
 
 namespace margelo::nitro::munimbluetooth {
 
@@ -86,8 +89,8 @@ namespace margelo::nitro::munimbluetooth {
       virtual std::shared_ptr<Promise<std::vector<GATTService>>> discoverServices(const std::string& deviceId) = 0;
       virtual std::shared_ptr<Promise<CharacteristicValue>> readCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) = 0;
       virtual std::shared_ptr<Promise<void>> writeCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID, const std::string& value, std::optional<WriteType> writeType) = 0;
-      virtual void subscribeToCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) = 0;
-      virtual void unsubscribeFromCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) = 0;
+      virtual std::shared_ptr<Promise<void>> subscribeToCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) = 0;
+      virtual std::shared_ptr<Promise<void>> unsubscribeFromCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) = 0;
       virtual std::shared_ptr<Promise<void>> notifyCharacteristic(const std::string& serviceUUID, const std::string& characteristicUUID, const std::string& value) = 0;
       virtual std::shared_ptr<Promise<std::vector<std::string>>> getConnectedDevices() = 0;
       virtual std::shared_ptr<Promise<double>> readRSSI(const std::string& deviceId) = 0;
@@ -97,8 +100,7 @@ namespace margelo::nitro::munimbluetooth {
       virtual std::function<void()> onDeviceDisconnected(const std::function<void(const std::string& /* deviceId */)>& callback) = 0;
       virtual std::function<void()> onCharacteristicValueChanged(const std::function<void(const std::string& /* deviceId */, const std::string& /* serviceUUID */, const std::string& /* characteristicUUID */, const std::string& /* value */)>& callback) = 0;
       virtual std::function<void()> onPeripheralStateChanged(const std::function<void(const std::string& /* state */)>& callback) = 0;
-      virtual void addListener(const std::string& eventName) = 0;
-      virtual void removeListeners(double count) = 0;
+      virtual std::function<void()> onDeviceFound(const std::function<void(const BLEDevice& /* device */)>& callback) = 0;
 
     protected:
       // Hybrid Setup

@@ -87,11 +87,11 @@ abstract class HybridMunimBluetoothSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
-  abstract fun subscribeToCharacteristic(deviceId: String, serviceUUID: String, characteristicUUID: String): Unit
+  abstract fun subscribeToCharacteristic(deviceId: String, serviceUUID: String, characteristicUUID: String): Promise<Unit>
   
   @DoNotStrip
   @Keep
-  abstract fun unsubscribeFromCharacteristic(deviceId: String, serviceUUID: String, characteristicUUID: String): Unit
+  abstract fun unsubscribeFromCharacteristic(deviceId: String, serviceUUID: String, characteristicUUID: String): Promise<Unit>
   
   @DoNotStrip
   @Keep
@@ -149,13 +149,14 @@ abstract class HybridMunimBluetoothSpec: HybridObject() {
     return Func_void_java(__result)
   }
   
-  @DoNotStrip
-  @Keep
-  abstract fun addListener(eventName: String): Unit
+  abstract fun onDeviceFound(callback: (device: BLEDevice) -> Unit): () -> Unit
   
   @DoNotStrip
   @Keep
-  abstract fun removeListeners(count: Double): Unit
+  private fun onDeviceFound_cxx(callback: Func_void_BLEDevice): Func_void {
+    val __result = onDeviceFound(callback)
+    return Func_void_java(__result)
+  }
 
   // Default implementation of `HybridObject.toString()`
   override fun toString(): String {

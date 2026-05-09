@@ -341,24 +341,40 @@ open class HybridMunimBluetoothSpec_cxx {
   }
   
   @inline(__always)
-  public final func subscribeToCharacteristic(deviceId: std.string, serviceUUID: std.string, characteristicUUID: std.string) -> bridge.Result_void_ {
+  public final func subscribeToCharacteristic(deviceId: std.string, serviceUUID: std.string, characteristicUUID: std.string) -> bridge.Result_std__shared_ptr_Promise_void___ {
     do {
-      try self.__implementation.subscribeToCharacteristic(deviceId: String(deviceId), serviceUUID: String(serviceUUID), characteristicUUID: String(characteristicUUID))
-      return bridge.create_Result_void_()
+      let __result = try self.__implementation.subscribeToCharacteristic(deviceId: String(deviceId), serviceUUID: String(serviceUUID), characteristicUUID: String(characteristicUUID))
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_void__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve() })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_void_(__exceptionPtr)
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
     }
   }
   
   @inline(__always)
-  public final func unsubscribeFromCharacteristic(deviceId: std.string, serviceUUID: std.string, characteristicUUID: std.string) -> bridge.Result_void_ {
+  public final func unsubscribeFromCharacteristic(deviceId: std.string, serviceUUID: std.string, characteristicUUID: std.string) -> bridge.Result_std__shared_ptr_Promise_void___ {
     do {
-      try self.__implementation.unsubscribeFromCharacteristic(deviceId: String(deviceId), serviceUUID: String(serviceUUID), characteristicUUID: String(characteristicUUID))
-      return bridge.create_Result_void_()
+      let __result = try self.__implementation.unsubscribeFromCharacteristic(deviceId: String(deviceId), serviceUUID: String(serviceUUID), characteristicUUID: String(characteristicUUID))
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_void__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve() })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_void_(__exceptionPtr)
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
     }
   }
   
@@ -528,24 +544,22 @@ open class HybridMunimBluetoothSpec_cxx {
   }
   
   @inline(__always)
-  public final func addListener(eventName: std.string) -> bridge.Result_void_ {
+  public final func onDeviceFound(callback: bridge.Func_void_BLEDevice) -> bridge.Result_std__function_void____ {
     do {
-      try self.__implementation.addListener(eventName: String(eventName))
-      return bridge.create_Result_void_()
+      let __result = try self.__implementation.onDeviceFound(callback: { () -> (BLEDevice) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_BLEDevice(callback)
+        return { (__device: BLEDevice) -> Void in
+          __wrappedFunction.call(__device)
+        }
+      }())
+      let __resultCpp = { () -> bridge.Func_void in
+        let __closureWrapper = Func_void(__result)
+        return bridge.create_Func_void(__closureWrapper.toUnsafe())
+      }()
+      return bridge.create_Result_std__function_void____(__resultCpp)
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_void_(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
-  public final func removeListeners(count: Double) -> bridge.Result_void_ {
-    do {
-      try self.__implementation.removeListeners(count: count)
-      return bridge.create_Result_void_()
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_void_(__exceptionPtr)
+      return bridge.create_Result_std__function_void____(__exceptionPtr)
     }
   }
 }

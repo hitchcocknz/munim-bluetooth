@@ -23,16 +23,9 @@ import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.ParcelUuid
 import android.util.Log
-import com.facebook.react.bridge.Arguments
-import com.facebook.react.bridge.WritableArray
-import com.facebook.react.bridge.WritableMap
-import com.facebook.react.modules.core.DeviceEventManagerModule
-import com.facebook.react.modules.core.PermissionAwareActivity
-import com.facebook.react.modules.core.PermissionListener
 import com.margelo.nitro.NitroModules
 import com.margelo.nitro.core.Promise
 import com.margelo.nitro.munimbluetooth.AdvertisingDataTypes
@@ -46,6 +39,7 @@ import com.margelo.nitro.munimbluetooth.ScanMode
 import com.margelo.nitro.munimbluetooth.ScanOptions
 import com.margelo.nitro.munimbluetooth.ServiceDataEntry
 import com.margelo.nitro.munimbluetooth.WriteType
+import com.margelo.nitro.munimbluetooth.BLEDevice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -82,8 +76,15 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
     private val pendingRssiReads = mutableMapOf<String, Promise<Double>>()
     private val lastCharacteristicValues = mutableMapOf<String, CharacteristicValue>()
     private val lastRssiValues = mutableMapOf<String, Double>()
-    private val eventEmitter = NitroEventEmitter(TAG)
+    // private val eventEmitter = NitroEventEmitter(TAG)
     private var nextPermissionRequestCode = BLUETOOTH_PERMISSION_REQUEST_CODE
+
+    private var onDeviceConnectedCallback: ((deviceId: String) -> Unit)? = null
+    private var onDeviceDisconnectedCallback: ((deviceId: String) -> Unit)? = null
+    private var onCharacteristicValueChangedCallback: ((deviceId: String, serviceUUID: String, characteristicUUID: String, value: String) -> Unit)? = null
+    private var onPeripheralStateChangedCallback: ((state: String) -> Unit)? = null
+    private var onDeviceFoundCallback: ((device: BLEDevice) -> Unit)? = null
+    private val pendingDescriptorWrites = mutableMapOf<String, Promise<Unit>>()
 
     private fun getBluetoothManager(): BluetoothManager? {
         val context = NitroModules.applicationContext ?: return null
@@ -238,56 +239,27 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
     }
 
     override fun isBluetoothEnabled(): Promise<Boolean> {
+        Log.d(TAG, "isBluetoothEnabled called")
+        Log.d(TAG, "hasPermissions: ${hasRequiredBluetoothPermissions()}")
+        Log.d(TAG, "bluetoothAdapter: $bluetoothAdapter")
+        Log.d(TAG, "adapter.isEnabled: ${bluetoothAdapter?.isEnabled}")
+        
         if (!hasRequiredBluetoothPermissions()) {
+            Log.d(TAG, "returning false - no permissions")
             return Promise.resolved(false)
         }
 
         ensureBluetoothManager()
+        Log.d(TAG, "after ensureManager - adapter.isEnabled: ${bluetoothAdapter?.isEnabled}")
         return Promise.resolved(bluetoothAdapter?.isEnabled == true)
     }
 
     override fun requestBluetoothPermission(): Promise<Boolean> {
-        val context = NitroModules.applicationContext ?: run {
-            Log.w(TAG, "Unable to request Bluetooth permissions: React context unavailable")
-            return Promise.resolved(false)
-        }
-
-        val missingPermissions = BluetoothPermissionUtils.missingPermissions(context)
-        if (missingPermissions.isEmpty()) {
-            return Promise.resolved(true)
-        }
-
-        val activity = context.currentActivity as? PermissionAwareActivity
-        if (activity == null) {
-            Log.w(TAG, "Unable to request Bluetooth permissions: current activity unavailable")
-            return Promise.resolved(false)
-        }
-
-        val requestCode = nextPermissionRequestCode++
-        val promise = Promise<Boolean>()
-
-        try {
-            activity.requestPermissions(
-                missingPermissions,
-                requestCode,
-                PermissionListener { callbackRequestCode, _, grantResults ->
-                    if (callbackRequestCode != requestCode) {
-                        return@PermissionListener false
-                    }
-
-                    val isGranted =
-                        grantResults.isNotEmpty() &&
-                            grantResults.all { it == PackageManager.PERMISSION_GRANTED }
-                    promise.resolve(isGranted)
-                    true
-                }
-            )
-        } catch (error: IllegalStateException) {
-            Log.w(TAG, "Unable to request Bluetooth permissions", error)
-            promise.resolve(false)
-        }
-
-        return promise
+        val context = NitroModules.applicationContext ?: return Promise.resolved(false)
+        val missing = BluetoothPermissionUtils.missingPermissions(context)
+        // In bridgeless mode we can only report current state — the host app
+        // must request permissions via its own flow before calling BLE APIs.
+        return Promise.resolved(missing.isEmpty())
     }
 
     override fun startScan(options: ScanOptions?) {
@@ -336,14 +308,14 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 val device = result.device
                 discoveredDevices[device.address] = device
-                eventEmitter.emit("deviceFound", buildScanPayload(result))
+                onDeviceFoundCallback?.invoke(buildBLEDevice(result))  // ← replace eventEmitter.emit
             }
 
             override fun onBatchScanResults(results: MutableList<ScanResult>) {
                 results.forEach { result ->
                     val device = result.device
                     discoveredDevices[device.address] = device
-                    eventEmitter.emit("deviceFound", buildScanPayload(result))
+                    onDeviceFoundCallback?.invoke(buildBLEDevice(result))  // ← replace eventEmitter.emit
                 }
             }
 
@@ -372,9 +344,13 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         }
 
         ensureBluetoothManager()
-        connectedDevices[deviceId]?.let { existingGatt ->
-            if (existingGatt.services != null) {
-                return Promise.resolved(Unit)
+
+        // Close any stale GATT before reconnecting
+        connectedDevices.remove(deviceId)?.let { staleGatt ->
+            staleGatt.disconnect()
+            bluetoothScope.launch {
+                delay(500)
+                staleGatt.close()
             }
         }
 
@@ -394,12 +370,17 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         val promise = Promise<Unit>()
         pendingConnections[deviceId] = promise
 
-        val gatt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            device.connectGatt(context, false, createGattCallback(deviceId), BluetoothDevice.TRANSPORT_LE)
-        } else {
-            device.connectGatt(context, false, createGattCallback(deviceId))
+        // Delay connection attempt to let BLE stack settle after previous disconnect
+        bluetoothScope.launch {
+            delay(300)
+            val gatt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                device.connectGatt(context, false, createGattCallback(deviceId), BluetoothDevice.TRANSPORT_LE)
+            } else {
+                device.connectGatt(context, false, createGattCallback(deviceId))
+            }
+            connectedDevices[deviceId] = gatt
         }
-        connectedDevices[deviceId] = gatt
+
         return promise
     }
 
@@ -410,20 +391,22 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
 
         val gatt = connectedDevices.remove(deviceId)
         gatt?.disconnect()
-        gatt?.close()
+        // Delay close to allow stack to process disconnect
+        bluetoothScope.launch {
+            delay(500)
+            gatt?.close()
+        }
 
         rejectPendingOperationsForDevice(deviceId, IllegalStateException("Disconnected from $deviceId"))
-        eventEmitter.emit("deviceDisconnected", mapOf("deviceId" to deviceId))
+        onDeviceDisconnectedCallback?.invoke(deviceId)
     }
 
     override fun discoverServices(deviceId: String): Promise<Array<GATTService>> {
         val gatt = connectedDevices[deviceId]
             ?: return Promise.rejected(IllegalStateException("Device not connected: $deviceId"))
 
-        if (gatt.services.isNotEmpty()) {
-            return Promise.resolved(buildGattServices(gatt))
-        }
-
+        // Always rediscover — cached services can cause write failures
+        // if the GATT isn't fully ready even though services appear populated
         val promise = Promise<Array<GATTService>>()
         pendingServiceDiscoveries[deviceId] = promise
         if (!gatt.discoverServices()) {
@@ -463,79 +446,135 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         value: String,
         writeType: WriteType?
     ): Promise<Unit> {
+
+        // ── Central role: write to remote peripheral ───────────────────────────
         val gatt = connectedDevices[deviceId]
-            ?: return Promise.rejected(IllegalStateException("Device not connected: $deviceId"))
-        val characteristic = findCharacteristic(gatt, serviceUUID, characteristicUUID)
-            ?: return Promise.rejected(
-                IllegalArgumentException("Characteristic not found: $serviceUUID/$characteristicUUID")
-            )
-        val data = hexStringToByteArray(value)
-            ?: return Promise.rejected(IllegalArgumentException("Invalid hex string for characteristic write"))
+        if (gatt != null) {
+            Log.d(TAG, "writeCharacteristic (central role): deviceId=$deviceId")
+            
+            val characteristic = findCharacteristic(gatt, serviceUUID, characteristicUUID)
+                ?: return Promise.rejected(IllegalArgumentException(
+                    "Characteristic not found: $serviceUUID/$characteristicUUID"))
 
+            characteristic.value = android.util.Base64.decode(value, android.util.Base64.NO_WRAP)
+            characteristic.writeType = when (writeType) {
+                WriteType.WRITEWITHOUTRESPONSE -> BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                else -> BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            }
+
+            val promise = Promise<Unit>()
+            val key = characteristicKey(deviceId, serviceUUID, characteristicUUID)
+            pendingWrites[key] = promise
+
+            val result = gatt.writeCharacteristic(characteristic)
+            Log.d(TAG, "writeCharacteristic: gatt.writeCharacteristic returned $result")
+
+            if (!result) {
+                pendingWrites.remove(key)
+                return Promise.rejected(IllegalStateException("Failed to start characteristic write"))
+            }
+            return promise
+        }
+
+        // ── Peripheral role: notify connected central ──────────────────────────
+        Log.d(TAG, "writeCharacteristic (peripheral role): notifying central $deviceId")
+        val server = gattServer
+            ?: return Promise.rejected(IllegalStateException("GATT server not initialized"))
+
+        val targetService = server.services
+            ?.firstOrNull { it.uuid.toString().equals(serviceUUID, ignoreCase = true) }
+            ?: return Promise.rejected(IllegalArgumentException("Service not found: $serviceUUID"))
+
+        val characteristic = targetService.characteristics
+            ?.firstOrNull { it.uuid.toString().equals(characteristicUUID, ignoreCase = true) }
+            ?: return Promise.rejected(IllegalArgumentException("Characteristic not found: $characteristicUUID"))
+
+        val data = android.util.Base64.decode(value, android.util.Base64.NO_WRAP)
         characteristic.value = data
-        characteristic.writeType = when (writeType) {
-            WriteType.WRITEWITHOUTRESPONSE -> BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-            else -> BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+
+        // Find the specific central device to notify
+        val centralDevice = bluetoothManager
+            ?.getConnectedDevices(android.bluetooth.BluetoothProfile.GATT)
+            ?.firstOrNull { it.address == deviceId }
+
+        if (centralDevice == null) {
+            // No specific device found — notify all connected centrals
+            val connectedCentrals = bluetoothManager
+                ?.getConnectedDevices(android.bluetooth.BluetoothProfile.GATT)
+                ?: emptyList()
+
+            if (connectedCentrals.isEmpty()) {
+                return Promise.rejected(IllegalStateException("No connected centrals to notify"))
+            }
+
+            connectedCentrals.forEach { device ->
+                server.notifyCharacteristicChanged(device, characteristic, false)
+            }
+        } else {
+            server.notifyCharacteristicChanged(centralDevice, characteristic, false)
         }
 
-        val promise = Promise<Unit>()
-        val key = characteristicKey(deviceId, serviceUUID, characteristicUUID)
-        pendingWrites[key] = promise
-
-        if (!gatt.writeCharacteristic(characteristic)) {
-            pendingWrites.remove(key)
-            return Promise.rejected(IllegalStateException("Failed to start characteristic write"))
-        }
-        return promise
+        return Promise.resolved(Unit)
     }
 
     override fun subscribeToCharacteristic(
         deviceId: String,
         serviceUUID: String,
         characteristicUUID: String
-    ) {
-        val gatt = connectedDevices[deviceId] ?: return
-        val characteristic = findCharacteristic(gatt, serviceUUID, characteristicUUID) ?: return
+    ): Promise<Unit> {
+        val gatt = connectedDevices[deviceId]
+            ?: return Promise.rejected(IllegalStateException("Device not connected: $deviceId"))
+        val characteristic = findCharacteristic(gatt, serviceUUID, characteristicUUID)
+            ?: return Promise.rejected(IllegalArgumentException("Characteristic not found: $serviceUUID/$characteristicUUID"))
+
         gatt.setCharacteristicNotification(characteristic, true)
 
-        characteristic.getDescriptor(CLIENT_CHARACTERISTIC_CONFIG_UUID)?.let { descriptor ->
-            descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-            gatt.writeDescriptor(descriptor)
+        val descriptor = characteristic.getDescriptor(CLIENT_CHARACTERISTIC_CONFIG_UUID)
+        if (descriptor == null) {
+            Log.w(TAG, "subscribeToCharacteristic: no CCCD descriptor — resolving immediately")
+            return Promise.resolved(Unit)
         }
+
+        descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+        val promise = Promise<Unit>()
+        val key = "${deviceId}|${characteristic.uuid}"
+        pendingDescriptorWrites[key] = promise
+
+        val result = gatt.writeDescriptor(descriptor)
+        Log.d(TAG, "subscribeToCharacteristic: writeDescriptor returned $result for $characteristicUUID")
+        if (!result) {
+            pendingDescriptorWrites.remove(key)
+            return Promise.rejected(IllegalStateException("Failed to write CCCD descriptor"))
+        }
+        return promise
     }
 
     override fun unsubscribeFromCharacteristic(
         deviceId: String,
         serviceUUID: String,
         characteristicUUID: String
-    ) {
-        val gatt = connectedDevices[deviceId] ?: return
-        val characteristic = findCharacteristic(gatt, serviceUUID, characteristicUUID) ?: return
-        gatt.setCharacteristicNotification(characteristic, false)
-
-        characteristic.getDescriptor(CLIENT_CHARACTERISTIC_CONFIG_UUID)?.let { descriptor ->
-            descriptor.value = BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
-            gatt.writeDescriptor(descriptor)
-        }
-    }
-
-    override fun getConnectedDevices(): Promise<Array<String>> {
-        return Promise.resolved(connectedDevices.keys.toTypedArray())
-    }
-
-    override fun readRSSI(deviceId: String): Promise<Double> {
+    ): Promise<Unit> {
         val gatt = connectedDevices[deviceId]
             ?: return Promise.rejected(IllegalStateException("Device not connected: $deviceId"))
+        val characteristic = findCharacteristic(gatt, serviceUUID, characteristicUUID)
+            ?: return Promise.rejected(IllegalArgumentException("Characteristic not found"))
 
-        lastRssiValues[deviceId]?.let { cachedRssi ->
-            return Promise.resolved(cachedRssi)
+        gatt.setCharacteristicNotification(characteristic, false)
+
+        val descriptor = characteristic.getDescriptor(CLIENT_CHARACTERISTIC_CONFIG_UUID)
+        if (descriptor == null) {
+            return Promise.resolved(Unit)
         }
 
-        val promise = Promise<Double>()
-        pendingRssiReads[deviceId] = promise
-        if (!gatt.readRemoteRssi()) {
-            pendingRssiReads.remove(deviceId)
-            return Promise.rejected(IllegalStateException("Failed to start RSSI read"))
+        descriptor.value = BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+        val promise = Promise<Unit>()
+        val key = "${deviceId}|${characteristic.uuid}"
+        pendingDescriptorWrites[key] = promise
+
+        val result = gatt.writeDescriptor(descriptor)
+        if (!result) {
+            pendingDescriptorWrites.remove(key)
+            return Promise.rejected(IllegalStateException("Failed to write CCCD descriptor"))
         }
         return promise
     }
@@ -605,12 +644,65 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         context.startService(intent)
     }
 
-    override fun addListener(eventName: String) {
-        // Nitro uses JS-side listener registration. No native bookkeeping required here.
+    override fun onDeviceConnected(callback: (deviceId: String) -> Unit): () -> Unit {
+        onDeviceConnectedCallback = callback
+        return { onDeviceConnectedCallback = null }
     }
 
-    override fun removeListeners(count: Double) {
-        // Nitro uses JS-side listener registration. No native bookkeeping required here.
+    override fun onDeviceDisconnected(callback: (deviceId: String) -> Unit): () -> Unit {
+        onDeviceDisconnectedCallback = callback
+        return { onDeviceDisconnectedCallback = null }
+    }
+
+    override fun onCharacteristicValueChanged(
+        callback: (deviceId: String, serviceUUID: String, characteristicUUID: String, value: String) -> Unit
+    ): () -> Unit {
+        onCharacteristicValueChangedCallback = callback
+        return { onCharacteristicValueChangedCallback = null }
+    }
+
+    override fun onPeripheralStateChanged(callback: (state: String) -> Unit): () -> Unit {
+        onPeripheralStateChangedCallback = callback
+        return { onPeripheralStateChangedCallback = null }
+    }
+
+    override fun onDeviceFound(callback: (device: BLEDevice) -> Unit): () -> Unit {
+        onDeviceFoundCallback = callback
+        return { onDeviceFoundCallback = null }
+    }
+
+    override fun notifyCharacteristic(
+        serviceUUID: String,
+        characteristicUUID: String,
+        value: String
+    ): Promise<Unit> {
+        val server = gattServer
+            ?: return Promise.rejected(IllegalStateException("GATT server not initialized"))
+
+        val targetService = server.services
+            ?.firstOrNull { it.uuid.toString().equals(serviceUUID, ignoreCase = true) }
+            ?: return Promise.rejected(IllegalArgumentException("Service not found: $serviceUUID"))
+
+        val characteristic = targetService.characteristics
+            ?.firstOrNull { it.uuid.toString().equals(characteristicUUID, ignoreCase = true) }
+            ?: return Promise.rejected(IllegalArgumentException("Characteristic not found: $characteristicUUID"))
+
+        val data = value.toByteArray(Charsets.UTF_8)
+        characteristic.value = data
+
+        val connectedCentrals = bluetoothManager
+            ?.getConnectedDevices(android.bluetooth.BluetoothProfile.GATT)
+            ?: emptyList()
+
+        if (connectedCentrals.isEmpty()) {
+            return Promise.rejected(IllegalStateException("No connected centrals to notify"))
+        }
+
+        connectedCentrals.forEach { device ->
+            server.notifyCharacteristicChanged(device, characteristic, false)
+        }
+
+        return Promise.resolved(Unit)
     }
 
     private fun restartAdvertising(delayMs: Long) {
@@ -695,10 +787,22 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
                 offset: Int,
                 value: ByteArray?
             ) {
-                characteristic.value = value ?: byteArrayOf()
+                val data = value ?: byteArrayOf()
+                characteristic.value = data
+
                 if (responseNeeded) {
                     gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, null)
                 }
+
+                // Fire callback so JS layer receives the write
+                val text = android.util.Base64.encodeToString(data, android.util.Base64.NO_WRAP)
+                onCharacteristicValueChangedCallback?.invoke(
+                    device.address,
+                    characteristic.service?.uuid?.toString() ?: "",
+                    characteristic.uuid.toString(),
+                    text
+                )
+                Log.d(TAG, "Peripheral received write from ${device.address} on ${characteristic.uuid}")
             }
         }
     }
@@ -717,46 +821,69 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
                 when (newState) {
                     BluetoothProfile.STATE_CONNECTED -> {
                         connectedDevices[deviceId] = gatt
-                        pendingConnections.remove(deviceId)?.resolve(Unit)
-                        eventEmitter.emit("deviceConnected", mapOf("deviceId" to deviceId))
+                        // No peripheral.delegate line here — that's Swift only
+                        Log.d(TAG, "Connected to $deviceId — requesting MTU 512")
+                        gatt.requestMtu(512)
+                        // Don't resolve promise here — wait for onMtuChanged
                     }
 
                     BluetoothProfile.STATE_DISCONNECTED -> {
                         pendingConnections.remove(deviceId)?.reject(
                             IllegalStateException("Disconnected from $deviceId")
                         )
-                        connectedDevices.remove(deviceId)?.close()
+                        val staleGatt = connectedDevices.remove(deviceId)
+                        bluetoothScope.launch {
+                            delay(500)
+                            staleGatt?.close()
+                            Log.d(TAG, "GATT closed after disconnect for $deviceId")
+                        }
                         rejectPendingOperationsForDevice(
                             deviceId,
                             IllegalStateException("Disconnected from $deviceId")
                         )
-                        eventEmitter.emit("deviceDisconnected", mapOf("deviceId" to deviceId))
+                        onDeviceDisconnectedCallback?.invoke(deviceId)
                     }
                 }
             }
 
+            override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+                Log.d(TAG, "MTU changed to $mtu for $deviceId (status=$status)")
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    // MTU negotiated — now safe to resolve connection
+                    pendingConnections.remove(deviceId)?.resolve(Unit)
+                    onDeviceConnectedCallback?.invoke(deviceId)
+                } else {
+                    // MTU negotiation failed — resolve anyway with default MTU
+                    Log.w(TAG, "MTU negotiation failed for $deviceId, using default")
+                    pendingConnections.remove(deviceId)?.resolve(Unit)
+                    onDeviceConnectedCallback?.invoke(deviceId)
+                }
+            }
+
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+                Log.d(TAG, "onServicesDiscovered: deviceId=$deviceId status=$status services=${gatt.services.size}")
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     val services = buildGattServices(gatt)
                     pendingServiceDiscoveries.remove(deviceId)?.resolve(services)
-                    eventEmitter.emit(
-                        "servicesDiscovered",
-                        mapOf("deviceId" to deviceId, "services" to services.map { service ->
-                            mapOf(
-                                "uuid" to service.uuid,
-                                "characteristics" to service.characteristics.map { characteristic ->
-                                    mapOf(
-                                        "uuid" to characteristic.uuid,
-                                        "properties" to characteristic.properties.toList(),
-                                        "value" to characteristic.value
-                                    )
-                                }
-                            )
-                        })
-                    )
                 } else {
                     pendingServiceDiscoveries.remove(deviceId)?.reject(
                         IllegalStateException("Failed to discover services for $deviceId (status=$status)")
+                    )
+                }
+            }
+
+            override fun onDescriptorWrite(
+                gatt: BluetoothGatt,
+                descriptor: BluetoothGattDescriptor,
+                status: Int
+            ) {
+                val key = "${deviceId}|${descriptor.characteristic.uuid}"
+                Log.d(TAG, "onDescriptorWrite: key=$key status=$status")
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    pendingDescriptorWrites.remove(key)?.resolve(Unit)
+                } else {
+                    pendingDescriptorWrites.remove(key)?.reject(
+                        IllegalStateException("Descriptor write failed status=$status")
                     )
                 }
             }
@@ -775,15 +902,21 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
                     val value = buildCharacteristicValue(characteristic)
                     lastCharacteristicValues[key] = value
                     pendingReads.remove(key)?.resolve(value)
-                    eventEmitter.emit(
-                        "characteristicValueChanged",
-                        mapOf(
-                            "deviceId" to deviceId,
-                            "serviceUUID" to value.serviceUUID,
-                            "characteristicUUID" to value.characteristicUUID,
-                            "value" to value.value
-                        )
+                    onCharacteristicValueChangedCallback?.invoke(
+                        deviceId,
+                        value.serviceUUID,
+                        value.characteristicUUID,
+                        value.value
                     )
+                    // eventEmitter.emit(
+                    //     "characteristicValueChanged",
+                    //     mapOf(
+                    //         "deviceId" to deviceId,
+                    //         "serviceUUID" to value.serviceUUID,
+                    //         "characteristicUUID" to value.characteristicUUID,
+                    //         "value" to value.value
+                    //     )
+                    // )
                 } else {
                     pendingReads.remove(key)?.reject(
                         IllegalStateException("Failed to read characteristic $key (status=$status)")
@@ -817,15 +950,21 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
                 val value = buildCharacteristicValue(characteristic)
                 val key = characteristicKey(deviceId, value.serviceUUID, value.characteristicUUID)
                 lastCharacteristicValues[key] = value
-                eventEmitter.emit(
-                    "characteristicValueChanged",
-                    mapOf(
-                        "deviceId" to deviceId,
-                        "serviceUUID" to value.serviceUUID,
-                        "characteristicUUID" to value.characteristicUUID,
-                        "value" to value.value
-                    )
+                onCharacteristicValueChangedCallback?.invoke(
+                    deviceId,
+                    value.serviceUUID,
+                    value.characteristicUUID,
+                    value.value
                 )
+                // eventEmitter.emit(
+                //     "characteristicValueChanged",
+                //     mapOf(
+                //         "deviceId" to deviceId,
+                //         "serviceUUID" to value.serviceUUID,
+                //         "characteristicUUID" to value.characteristicUUID,
+                //         "value" to value.value
+                //     )
+                // )
             }
 
             override fun onReadRemoteRssi(gatt: BluetoothGatt, rssi: Int, status: Int) {
@@ -833,10 +972,6 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
                     val rssiValue = rssi.toDouble()
                     lastRssiValues[deviceId] = rssiValue
                     pendingRssiReads.remove(deviceId)?.resolve(rssiValue)
-                    eventEmitter.emit(
-                        "rssiUpdated",
-                        mapOf("deviceId" to deviceId, "rssi" to rssiValue)
-                    )
                 } else {
                     pendingRssiReads.remove(deviceId)?.reject(
                         IllegalStateException("Failed to read RSSI for $deviceId (status=$status)")
@@ -865,7 +1000,7 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
                     GATTCharacteristic(
                         uuid = characteristic.uuid.toString(),
                         properties = propertiesToArray(characteristic.properties),
-                        value = characteristic.value?.toHexString()
+                        value = characteristic.value?.let { android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)}
                     )
                 }.toTypedArray()
             )
@@ -874,7 +1009,9 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
 
     private fun buildCharacteristicValue(characteristic: BluetoothGattCharacteristic): CharacteristicValue {
         return CharacteristicValue(
-            value = characteristic.value?.toHexString() ?: "",
+            value = characteristic.value?.let { 
+                android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP) 
+            } ?: "",
             serviceUUID = characteristic.service.uuid.toString(),
             characteristicUUID = characteristic.uuid.toString()
         )
@@ -898,40 +1035,6 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         characteristicUUID: String
     ): String {
         return "$deviceId|${serviceUUID.lowercase()}|${characteristicUUID.lowercase()}"
-    }
-
-    private fun buildScanPayload(result: ScanResult): Map<String, Any?> {
-        val record = result.scanRecord
-        val manufacturerData = extractManufacturerData(record)
-        val serviceUUIDs = record?.serviceUuids?.map { it.uuid.toString() }
-        val serviceData = extractServiceData(record)
-        val txPower = record?.txPowerLevel?.takeIf { it != Int.MIN_VALUE }
-        val advertisingData = mutableMapOf<String, Any?>()
-
-        record?.deviceName?.let { advertisingData["completeLocalName"] = it }
-        txPower?.let { advertisingData["txPowerLevel"] = it }
-        manufacturerData?.let { advertisingData["manufacturerData"] = it }
-        serviceUUIDs?.let { advertisingData["serviceUUIDs"] = it }
-        serviceData?.takeIf { it.isNotEmpty() }?.let { entries ->
-            advertisingData["serviceData"] = entries.map { mapOf("uuid" to it.uuid, "data" to it.data) }
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            advertisingData["isConnectable"] = result.isConnectable
-        }
-        advertisingData["rssi"] = result.rssi
-
-        return mapOf(
-            "id" to result.device.address,
-            "name" to result.device.name,
-            "localName" to record?.deviceName,
-            "manufacturerData" to manufacturerData,
-            "serviceUUIDs" to serviceUUIDs,
-            "serviceData" to serviceData?.map { mapOf("uuid" to it.uuid, "data" to it.data) },
-            "rssi" to result.rssi,
-            "txPowerLevel" to txPower,
-            "isConnectable" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) result.isConnectable else null,
-            "advertisingData" to advertisingData
-        )
     }
 
     private fun extractManufacturerData(record: ScanRecord?): String? {
@@ -1126,73 +1229,109 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         previousAdapterName = null
     }
 
+    private fun buildBLEDevice(result: ScanResult): BLEDevice {
+        val record = result.scanRecord
+        val manufacturerData = extractManufacturerData(record)
+        val serviceUUIDs = record?.serviceUuids?.map { it.uuid.toString() }?.toTypedArray()
+        val txPower = record?.txPowerLevel?.takeIf { it != Int.MIN_VALUE }?.toDouble()
+
+        val advertisingData = AdvertisingDataTypes(
+            flags = null,
+            incompleteServiceUUIDs16 = null,
+            completeServiceUUIDs16 = serviceUUIDs,
+            incompleteServiceUUIDs32 = null,
+            completeServiceUUIDs32 = null,
+            incompleteServiceUUIDs128 = null,
+            completeServiceUUIDs128 = null,
+            shortenedLocalName = null,
+            completeLocalName = record?.deviceName,
+            txPowerLevel = txPower,
+            serviceSolicitationUUIDs16 = null,
+            serviceSolicitationUUIDs128 = null,
+            serviceData16 = extractServiceData(record)?.toTypedArray(),
+            serviceData32 = null,
+            serviceData128 = null,
+            appearance = null,
+            serviceSolicitationUUIDs32 = null,
+            manufacturerData = manufacturerData
+        )
+
+        return BLEDevice(
+            id = result.device.address,
+            name = result.device.name,
+            rssi = result.rssi.toDouble(),
+            advertisingData = advertisingData,
+            serviceUUIDs = serviceUUIDs,
+            isConnectable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) result.isConnectable else null
+        )
+    }
+
     companion object {
         private const val TAG = "HybridMunimBluetooth"
         private const val BLUETOOTH_PERMISSION_REQUEST_CODE = 9137
-        private val CLIENT_CHARACTERISTIC_CONFIG_UUID =
-            UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+        private val CLIENT_CHARACTERISTIC_CONFIG_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     }
 }
 
-private class NitroEventEmitter(private val tag: String) {
-    fun emit(eventName: String, payload: Map<String, Any?>) {
-        val context = NitroModules.applicationContext
-        if (context == null) {
-            Log.w(tag, "Unable to emit $eventName: React context unavailable")
-            return
-        }
+// private class NitroEventEmitter(private val tag: String) {
+//     fun emit(eventName: String, payload: Map<String, Any?>) {
+//         val context = NitroModules.applicationContext
+//         if (context == null) {
+//             Log.w(tag, "Unable to emit $eventName: React context unavailable")
+//             return
+//         }
         
-        val writable = Arguments.createMap()
-        payload.forEach { (key, value) ->
-            writeValue(writable, key, value)
-        }
+//         val writable = Arguments.createMap()
+//         payload.forEach { (key, value) ->
+//             writeValue(writable, key, value)
+//         }
         
-        context
-            .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-            .emit(eventName, writable)
-    }
+//         context
+//             .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+//             .emit(eventName, writable)
+//     }
     
-    private fun writeValue(map: WritableMap, key: String, value: Any?) {
-        when (value) {
-            null -> map.putNull(key)
-            is String -> map.putString(key, value)
-            is Boolean -> map.putBoolean(key, value)
-            is Int -> map.putInt(key, value)
-            is Double -> map.putDouble(key, value)
-            is Float -> map.putDouble(key, value.toDouble())
-            is Long -> map.putDouble(key, value.toDouble())
-            is Map<*, *> -> map.putMap(key, convertMap(value))
-            is List<*> -> map.putArray(key, convertArray(value))
-            else -> map.putString(key, value.toString())
-        }
-    }
+//     private fun writeValue(map: WritableMap, key: String, value: Any?) {
+//         when (value) {
+//             null -> map.putNull(key)
+//             is String -> map.putString(key, value)
+//             is Boolean -> map.putBoolean(key, value)
+//             is Int -> map.putInt(key, value)
+//             is Double -> map.putDouble(key, value)
+//             is Float -> map.putDouble(key, value.toDouble())
+//             is Long -> map.putDouble(key, value.toDouble())
+//             is Map<*, *> -> map.putMap(key, convertMap(value))
+//             is List<*> -> map.putArray(key, convertArray(value))
+//             else -> map.putString(key, value.toString())
+//         }
+//     }
     
-    private fun convertMap(map: Map<*, *>): WritableMap {
-        val writable = Arguments.createMap()
-        map.forEach { (key, value) ->
-            if (key is String) {
-                writeValue(writable, key, value)
-            }
-        }
-        return writable
-    }
+//     private fun convertMap(map: Map<*, *>): WritableMap {
+//         val writable = Arguments.createMap()
+//         map.forEach { (key, value) ->
+//             if (key is String) {
+//                 writeValue(writable, key, value)
+//             }
+//         }
+//         return writable
+//     }
     
-    private fun convertArray(list: List<*>): WritableArray {
-        val writable = Arguments.createArray()
-        list.forEach { value ->
-            when (value) {
-                null -> writable.pushNull()
-                is String -> writable.pushString(value)
-                is Boolean -> writable.pushBoolean(value)
-                is Int -> writable.pushInt(value)
-                is Double -> writable.pushDouble(value)
-                is Float -> writable.pushDouble(value.toDouble())
-                is Long -> writable.pushDouble(value.toDouble())
-                is Map<*, *> -> writable.pushMap(convertMap(value))
-                is List<*> -> writable.pushArray(convertArray(value))
-                else -> writable.pushString(value.toString())
-            }
-        }
-        return writable
-    }
-}
+//     private fun convertArray(list: List<*>): WritableArray {
+//         val writable = Arguments.createArray()
+//         list.forEach { value ->
+//             when (value) {
+//                 null -> writable.pushNull()
+//                 is String -> writable.pushString(value)
+//                 is Boolean -> writable.pushBoolean(value)
+//                 is Int -> writable.pushInt(value)
+//                 is Double -> writable.pushDouble(value)
+//                 is Float -> writable.pushDouble(value.toDouble())
+//                 is Long -> writable.pushDouble(value.toDouble())
+//                 is Map<*, *> -> writable.pushMap(convertMap(value))
+//                 is List<*> -> writable.pushArray(convertArray(value))
+//                 else -> writable.pushString(value.toString())
+//             }
+//         }
+//         return writable
+//     }
+// }

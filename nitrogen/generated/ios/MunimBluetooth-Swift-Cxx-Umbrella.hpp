@@ -12,6 +12,8 @@
 namespace margelo::nitro::munimbluetooth { struct AdvertisingDataTypes; }
 // Forward declaration of `AdvertisingOptions` to properly resolve imports.
 namespace margelo::nitro::munimbluetooth { struct AdvertisingOptions; }
+// Forward declaration of `BLEDevice` to properly resolve imports.
+namespace margelo::nitro::munimbluetooth { struct BLEDevice; }
 // Forward declaration of `BackgroundSessionOptions` to properly resolve imports.
 namespace margelo::nitro::munimbluetooth { struct BackgroundSessionOptions; }
 // Forward declaration of `CharacteristicValue` to properly resolve imports.
@@ -34,6 +36,7 @@ namespace margelo::nitro::munimbluetooth { enum class WriteType; }
 // Include C++ defined types
 #include "AdvertisingDataTypes.hpp"
 #include "AdvertisingOptions.hpp"
+#include "BLEDevice.hpp"
 #include "BackgroundSessionOptions.hpp"
 #include "CharacteristicValue.hpp"
 #include "GATTCharacteristic.hpp"

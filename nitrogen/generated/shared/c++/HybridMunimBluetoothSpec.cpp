@@ -39,8 +39,7 @@ namespace margelo::nitro::munimbluetooth {
       prototype.registerHybridMethod("onDeviceDisconnected", &HybridMunimBluetoothSpec::onDeviceDisconnected);
       prototype.registerHybridMethod("onCharacteristicValueChanged", &HybridMunimBluetoothSpec::onCharacteristicValueChanged);
       prototype.registerHybridMethod("onPeripheralStateChanged", &HybridMunimBluetoothSpec::onPeripheralStateChanged);
-      prototype.registerHybridMethod("addListener", &HybridMunimBluetoothSpec::addListener);
-      prototype.registerHybridMethod("removeListeners", &HybridMunimBluetoothSpec::removeListeners);
+      prototype.registerHybridMethod("onDeviceFound", &HybridMunimBluetoothSpec::onDeviceFound);
     });
   }
 

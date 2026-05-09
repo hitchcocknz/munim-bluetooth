@@ -19,6 +19,7 @@
 #include "JFunc_void.hpp"
 #include "JFunc_void_std__string.hpp"
 #include "JFunc_void_std__string_std__string_std__string_std__string.hpp"
+#include "JFunc_void_BLEDevice.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
 
 namespace margelo::nitro::munimbluetooth {
@@ -47,6 +48,7 @@ void registerAllNatives() {
   margelo::nitro::munimbluetooth::JFunc_void_cxx::registerNatives();
   margelo::nitro::munimbluetooth::JFunc_void_std__string_cxx::registerNatives();
   margelo::nitro::munimbluetooth::JFunc_void_std__string_std__string_std__string_std__string_cxx::registerNatives();
+  margelo::nitro::munimbluetooth::JFunc_void_BLEDevice_cxx::registerNatives();
 
   // Register Nitro Hybrid Objects
   HybridObjectRegistry::registerHybridObjectConstructor(

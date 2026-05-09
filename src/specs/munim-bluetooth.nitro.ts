@@ -240,7 +240,7 @@ export interface MunimBluetooth
     deviceId: string,
     serviceUUID: string,
     characteristicUUID: string
-  ): void
+  ): Promise<void>
 
   /**
    * Unsubscribe from notifications/indications from a characteristic.
@@ -253,7 +253,7 @@ export interface MunimBluetooth
     deviceId: string,
     serviceUUID: string,
     characteristicUUID: string
-  ): void
+  ): Promise<void>
 
 
   notifyCharacteristic(serviceUUID: string, characteristicUUID: string, value: string): Promise<void>;
@@ -294,19 +294,20 @@ export interface MunimBluetooth
   onDeviceDisconnected(callback: (deviceId: string) => void): () => void;
   onCharacteristicValueChanged(callback: (deviceId: string, serviceUUID: string, characteristicUUID: string, value: string) => void): () => void;
   onPeripheralStateChanged(callback: (state: string) => void): () => void;
+  onDeviceFound(callback: (device: BLEDevice) => void): () => void;
 
-  /**
-   * Add an event listener.
-   *
-   * @param eventName - The name of the event to listen for.
-   */
-  addListener(eventName: string): void
+  // /**
+  //  * Add an event listener.
+  //  *
+  //  * @param eventName - The name of the event to listen for.
+  //  */
+  // addListener(eventName: string): void
 
-  /**
-   * Remove event listeners.
-   *
-   * @param count - Number of listeners to remove.
-   */
-  removeListeners(count: number): void
+  // /**
+  //  * Remove event listeners.
+  //  *
+  //  * @param count - Number of listeners to remove.
+  //  */
+  // removeListeners(count: number): void
 
 }

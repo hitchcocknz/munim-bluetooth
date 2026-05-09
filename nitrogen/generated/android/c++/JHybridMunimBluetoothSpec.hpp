@@ -68,8 +68,8 @@ namespace margelo::nitro::munimbluetooth {
     std::shared_ptr<Promise<std::vector<GATTService>>> discoverServices(const std::string& deviceId) override;
     std::shared_ptr<Promise<CharacteristicValue>> readCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) override;
     std::shared_ptr<Promise<void>> writeCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID, const std::string& value, std::optional<WriteType> writeType) override;
-    void subscribeToCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) override;
-    void unsubscribeFromCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) override;
+    std::shared_ptr<Promise<void>> subscribeToCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) override;
+    std::shared_ptr<Promise<void>> unsubscribeFromCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) override;
     std::shared_ptr<Promise<void>> notifyCharacteristic(const std::string& serviceUUID, const std::string& characteristicUUID, const std::string& value) override;
     std::shared_ptr<Promise<std::vector<std::string>>> getConnectedDevices() override;
     std::shared_ptr<Promise<double>> readRSSI(const std::string& deviceId) override;
@@ -79,8 +79,7 @@ namespace margelo::nitro::munimbluetooth {
     std::function<void()> onDeviceDisconnected(const std::function<void(const std::string& /* deviceId */)>& callback) override;
     std::function<void()> onCharacteristicValueChanged(const std::function<void(const std::string& /* deviceId */, const std::string& /* serviceUUID */, const std::string& /* characteristicUUID */, const std::string& /* value */)>& callback) override;
     std::function<void()> onPeripheralStateChanged(const std::function<void(const std::string& /* state */)>& callback) override;
-    void addListener(const std::string& eventName) override;
-    void removeListeners(double count) override;
+    std::function<void()> onDeviceFound(const std::function<void(const BLEDevice& /* device */)>& callback) override;
 
   private:
     jni::global_ref<JHybridMunimBluetoothSpec::JavaPart> _javaPart;

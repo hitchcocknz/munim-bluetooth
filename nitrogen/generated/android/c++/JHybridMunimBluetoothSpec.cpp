@@ -27,6 +27,8 @@ namespace margelo::nitro::munimbluetooth { enum class ScanMode; }
 namespace margelo::nitro::munimbluetooth { enum class WriteType; }
 // Forward declaration of `BackgroundSessionOptions` to properly resolve imports.
 namespace margelo::nitro::munimbluetooth { struct BackgroundSessionOptions; }
+// Forward declaration of `BLEDevice` to properly resolve imports.
+namespace margelo::nitro::munimbluetooth { struct BLEDevice; }
 
 #include "AdvertisingDataTypes.hpp"
 #include <NitroModules/Promise.hpp>
@@ -59,6 +61,9 @@ namespace margelo::nitro::munimbluetooth { struct BackgroundSessionOptions; }
 #include "JBackgroundSessionOptions.hpp"
 #include "JFunc_void_std__string.hpp"
 #include "JFunc_void_std__string_std__string_std__string_std__string.hpp"
+#include "BLEDevice.hpp"
+#include "JFunc_void_BLEDevice.hpp"
+#include "JBLEDevice.hpp"
 
 namespace margelo::nitro::munimbluetooth {
 
@@ -249,13 +254,35 @@ namespace margelo::nitro::munimbluetooth {
       return __promise;
     }();
   }
-  void JHybridMunimBluetoothSpec::subscribeToCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* deviceId */, jni::alias_ref<jni::JString> /* serviceUUID */, jni::alias_ref<jni::JString> /* characteristicUUID */)>("subscribeToCharacteristic");
-    method(_javaPart, jni::make_jstring(deviceId), jni::make_jstring(serviceUUID), jni::make_jstring(characteristicUUID));
+  std::shared_ptr<Promise<void>> JHybridMunimBluetoothSpec::subscribeToCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* deviceId */, jni::alias_ref<jni::JString> /* serviceUUID */, jni::alias_ref<jni::JString> /* characteristicUUID */)>("subscribeToCharacteristic");
+    auto __result = method(_javaPart, jni::make_jstring(deviceId), jni::make_jstring(serviceUUID), jni::make_jstring(characteristicUUID));
+    return [&]() {
+      auto __promise = Promise<void>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
+        __promise->resolve();
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
   }
-  void JHybridMunimBluetoothSpec::unsubscribeFromCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* deviceId */, jni::alias_ref<jni::JString> /* serviceUUID */, jni::alias_ref<jni::JString> /* characteristicUUID */)>("unsubscribeFromCharacteristic");
-    method(_javaPart, jni::make_jstring(deviceId), jni::make_jstring(serviceUUID), jni::make_jstring(characteristicUUID));
+  std::shared_ptr<Promise<void>> JHybridMunimBluetoothSpec::unsubscribeFromCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* deviceId */, jni::alias_ref<jni::JString> /* serviceUUID */, jni::alias_ref<jni::JString> /* characteristicUUID */)>("unsubscribeFromCharacteristic");
+    auto __result = method(_javaPart, jni::make_jstring(deviceId), jni::make_jstring(serviceUUID), jni::make_jstring(characteristicUUID));
+    return [&]() {
+      auto __promise = Promise<void>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
+        __promise->resolve();
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
   }
   std::shared_ptr<Promise<void>> JHybridMunimBluetoothSpec::notifyCharacteristic(const std::string& serviceUUID, const std::string& characteristicUUID, const std::string& value) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* serviceUUID */, jni::alias_ref<jni::JString> /* characteristicUUID */, jni::alias_ref<jni::JString> /* value */)>("notifyCharacteristic");
@@ -373,13 +400,18 @@ namespace margelo::nitro::munimbluetooth {
       }
     }();
   }
-  void JHybridMunimBluetoothSpec::addListener(const std::string& eventName) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* eventName */)>("addListener");
-    method(_javaPart, jni::make_jstring(eventName));
-  }
-  void JHybridMunimBluetoothSpec::removeListeners(double count) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<void(double /* count */)>("removeListeners");
-    method(_javaPart, count);
+  std::function<void()> JHybridMunimBluetoothSpec::onDeviceFound(const std::function<void(const BLEDevice& /* device */)>& callback) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JFunc_void::javaobject>(jni::alias_ref<JFunc_void_BLEDevice::javaobject> /* callback */)>("onDeviceFound_cxx");
+    auto __result = method(_javaPart, JFunc_void_BLEDevice_cxx::fromCpp(callback));
+    return [&]() -> std::function<void()> {
+      if (__result->isInstanceOf(JFunc_void_cxx::javaClassStatic())) [[likely]] {
+        auto downcast = jni::static_ref_cast<JFunc_void_cxx::javaobject>(__result);
+        return downcast->cthis()->getFunction();
+      } else {
+        auto __resultRef = jni::make_global(__result);
+        return JNICallable<JFunc_void, void()>(std::move(__resultRef));
+      }
+    }();
   }
 
 } // namespace margelo::nitro::munimbluetooth

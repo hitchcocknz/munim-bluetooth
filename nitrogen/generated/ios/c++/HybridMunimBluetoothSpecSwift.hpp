@@ -32,6 +32,8 @@ namespace margelo::nitro::munimbluetooth { struct CharacteristicValue; }
 namespace margelo::nitro::munimbluetooth { enum class WriteType; }
 // Forward declaration of `BackgroundSessionOptions` to properly resolve imports.
 namespace margelo::nitro::munimbluetooth { struct BackgroundSessionOptions; }
+// Forward declaration of `BLEDevice` to properly resolve imports.
+namespace margelo::nitro::munimbluetooth { struct BLEDevice; }
 
 #include "AdvertisingOptions.hpp"
 #include <string>
@@ -48,6 +50,7 @@ namespace margelo::nitro::munimbluetooth { struct BackgroundSessionOptions; }
 #include "WriteType.hpp"
 #include "BackgroundSessionOptions.hpp"
 #include <functional>
+#include "BLEDevice.hpp"
 
 #include "MunimBluetooth-Swift-Cxx-Umbrella.hpp"
 
@@ -197,17 +200,21 @@ namespace margelo::nitro::munimbluetooth {
       auto __value = std::move(__result.value());
       return __value;
     }
-    inline void subscribeToCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) override {
+    inline std::shared_ptr<Promise<void>> subscribeToCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) override {
       auto __result = _swiftPart.subscribeToCharacteristic(deviceId, serviceUUID, characteristicUUID);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
+      auto __value = std::move(__result.value());
+      return __value;
     }
-    inline void unsubscribeFromCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) override {
+    inline std::shared_ptr<Promise<void>> unsubscribeFromCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) override {
       auto __result = _swiftPart.unsubscribeFromCharacteristic(deviceId, serviceUUID, characteristicUUID);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
+      auto __value = std::move(__result.value());
+      return __value;
     }
     inline std::shared_ptr<Promise<void>> notifyCharacteristic(const std::string& serviceUUID, const std::string& characteristicUUID, const std::string& value) override {
       auto __result = _swiftPart.notifyCharacteristic(serviceUUID, characteristicUUID, value);
@@ -277,17 +284,13 @@ namespace margelo::nitro::munimbluetooth {
       auto __value = std::move(__result.value());
       return __value;
     }
-    inline void addListener(const std::string& eventName) override {
-      auto __result = _swiftPart.addListener(eventName);
+    inline std::function<void()> onDeviceFound(const std::function<void(const BLEDevice& /* device */)>& callback) override {
+      auto __result = _swiftPart.onDeviceFound(callback);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
-    }
-    inline void removeListeners(double count) override {
-      auto __result = _swiftPart.removeListeners(std::forward<decltype(count)>(count));
-      if (__result.hasError()) [[unlikely]] {
-        std::rethrow_exception(__result.error());
-      }
+      auto __value = std::move(__result.value());
+      return __value;
     }
 
   private:

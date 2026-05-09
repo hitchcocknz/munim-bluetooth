@@ -27,8 +27,8 @@ public protocol HybridMunimBluetoothSpec_protocol: HybridObject {
   func discoverServices(deviceId: String) throws -> Promise<[GATTService]>
   func readCharacteristic(deviceId: String, serviceUUID: String, characteristicUUID: String) throws -> Promise<CharacteristicValue>
   func writeCharacteristic(deviceId: String, serviceUUID: String, characteristicUUID: String, value: String, writeType: WriteType?) throws -> Promise<Void>
-  func subscribeToCharacteristic(deviceId: String, serviceUUID: String, characteristicUUID: String) throws -> Void
-  func unsubscribeFromCharacteristic(deviceId: String, serviceUUID: String, characteristicUUID: String) throws -> Void
+  func subscribeToCharacteristic(deviceId: String, serviceUUID: String, characteristicUUID: String) throws -> Promise<Void>
+  func unsubscribeFromCharacteristic(deviceId: String, serviceUUID: String, characteristicUUID: String) throws -> Promise<Void>
   func notifyCharacteristic(serviceUUID: String, characteristicUUID: String, value: String) throws -> Promise<Void>
   func getConnectedDevices() throws -> Promise<[String]>
   func readRSSI(deviceId: String) throws -> Promise<Double>
@@ -38,8 +38,7 @@ public protocol HybridMunimBluetoothSpec_protocol: HybridObject {
   func onDeviceDisconnected(callback: @escaping (_ deviceId: String) -> Void) throws -> () -> Void
   func onCharacteristicValueChanged(callback: @escaping (_ deviceId: String, _ serviceUUID: String, _ characteristicUUID: String, _ value: String) -> Void) throws -> () -> Void
   func onPeripheralStateChanged(callback: @escaping (_ state: String) -> Void) throws -> () -> Void
-  func addListener(eventName: String) throws -> Void
-  func removeListeners(count: Double) throws -> Void
+  func onDeviceFound(callback: @escaping (_ device: BLEDevice) -> Void) throws -> () -> Void
 }
 
 public extension HybridMunimBluetoothSpec_protocol {
