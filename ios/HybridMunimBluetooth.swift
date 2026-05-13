@@ -8,15 +8,38 @@
 import Foundation
 import CoreBluetooth
 import NitroModules
-// import React
+
+
+private protocol MunimBluetoothOwner: AnyObject {
+    func handlePeripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager)
+    func handlePeripheralManagerDidStartAdvertising(_ peripheral: CBPeripheralManager, error: Error?)
+    func handlePeripheralManagerDidAddService(_ peripheral: CBPeripheralManager, service: CBService, error: Error?)
+    func handlePeripheralManagerWillRestoreState(_ peripheral: CBPeripheralManager, state: [String: Any])
+    func handleDidReceiveWriteRequests(_ peripheral: CBPeripheralManager, requests: [CBATTRequest])
+    func handleCentralDidSubscribe(_ peripheral: CBPeripheralManager, central: CBCentral, characteristic: CBCharacteristic)
+    func handleCentralDidUnsubscribe(_ peripheral: CBPeripheralManager, central: CBCentral, characteristic: CBCharacteristic)
+    func handleCentralManagerDidUpdateState(_ central: CBCentralManager)
+    func handleCentralManagerWillRestoreState(_ central: CBCentralManager, state: [String: Any])
+    func handleCentralManagerDidDiscover(_ central: CBCentralManager, peripheral: CBPeripheral, advertisementData: [String: Any], rssi: NSNumber)
+    func handleCentralManagerDidConnect(_ central: CBCentralManager, peripheral: CBPeripheral)
+    func handleCentralManagerDidDisconnectPeripheral(_ central: CBCentralManager, peripheral: CBPeripheral, error: Error?)
+    func handleCentralManagerDidFailToConnect(_ central: CBCentralManager, peripheral: CBPeripheral, error: Error?)
+    func handlePeripheralDidDiscoverServices(_ peripheral: CBPeripheral, error: Error?)
+    func handlePeripheralDidDiscoverCharacteristics(_ peripheral: CBPeripheral, service: CBService, error: Error?)
+    func handlePeripheralDidUpdateValue(_ peripheral: CBPeripheral, characteristic: CBCharacteristic, error: Error?)
+    func handlePeripheralDidUpdateNotificationState(_ peripheral: CBPeripheral, characteristic: CBCharacteristic, error: Error?)
+    func handlePeripheralDidWriteValue(_ peripheral: CBPeripheral, characteristic: CBCharacteristic, error: Error?)
+    func handlePeripheralDidReadRSSI(_ peripheral: CBPeripheral, rssi: NSNumber, error: Error?)
+    func handlePeripheralManagerIsReadyToUpdateSubscribers(_ peripheral: CBPeripheralManager)
+}
 
 private let centralRestoreIdentifier = "com.munimbluetooth.central"
 private let peripheralRestoreIdentifier = "com.munimbluetooth.peripheral"
 
 private final class PeripheralManagerDelegateProxy: NSObject, CBPeripheralManagerDelegate {
-    weak var owner: HybridMunimBluetooth?
+    weak var owner: (any MunimBluetoothOwner)?
     
-    init(owner: HybridMunimBluetooth) {
+    init(owner: any MunimBluetoothOwner) {
         self.owner = owner
     }
     
@@ -47,12 +70,16 @@ private final class PeripheralManagerDelegateProxy: NSObject, CBPeripheralManage
     func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral, didUnsubscribeFrom characteristic: CBCharacteristic) {
         owner?.handleCentralDidUnsubscribe(peripheral, central: central, characteristic: characteristic)
     }
+
+    func peripheralManagerIsReady(toUpdateSubscribers peripheral: CBPeripheralManager) {
+        owner?.handlePeripheralManagerIsReadyToUpdateSubscribers(peripheral)
+    }
 }
 
 private final class CentralManagerDelegateProxy: NSObject, CBCentralManagerDelegate {
-    weak var owner: HybridMunimBluetooth?
+    weak var owner: (any MunimBluetoothOwner)?
     
-    init(owner: HybridMunimBluetooth) {
+    init(owner: any MunimBluetoothOwner) {
         self.owner = owner
     }
     
@@ -82,9 +109,9 @@ private final class CentralManagerDelegateProxy: NSObject, CBCentralManagerDeleg
 }
 
 private final class PeripheralDelegateProxy: NSObject, CBPeripheralDelegate {
-    weak var owner: HybridMunimBluetooth?
+    weak var owner: (any MunimBluetoothOwner)?
     
-    init(owner: HybridMunimBluetooth) {
+    init(owner: any MunimBluetoothOwner) {
         self.owner = owner
     }
     
@@ -102,6 +129,7 @@ private final class PeripheralDelegateProxy: NSObject, CBPeripheralDelegate {
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
     owner?.handlePeripheralDidUpdateNotificationState(peripheral, characteristic: characteristic, error: error)
+    }
     
     func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
         owner?.handlePeripheralDidWriteValue(peripheral, characteristic: characteristic, error: error)
@@ -112,7 +140,7 @@ private final class PeripheralDelegateProxy: NSObject, CBPeripheralDelegate {
     }
 }
 
-class HybridMunimBluetooth: HybridMunimBluetoothSpec {
+class HybridMunimBluetooth: HybridMunimBluetoothSpec, MunimBluetoothOwner {
     // Peripheral Manager
     private var peripheralManager: CBPeripheralManager?
     private var peripheralServices: [CBMutableService] = []
@@ -142,22 +170,24 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
     private var onDeviceFoundCallback: ((_ device: BLEDevice) -> Void)?
     private var pendingWritePromises: [String: Promise<Void>] = [:]
     private var pendingSubscribePromises: [String: Promise<Void>] = [:]
+    private var pendingNotifications: [(data: Data, char: CBMutableCharacteristic, promise: Promise<Void>)] = []
+
     
     override init() {
         super.init()
+        
+        #if !targetEnvironment(simulator)
         peripheralManager = CBPeripheralManager(
             delegate: peripheralManagerDelegateProxy,
             queue: nil,
-            options: [
-                CBPeripheralManagerOptionRestoreIdentifierKey: peripheralRestoreIdentifier
-            ]
+            options: [CBPeripheralManagerOptionRestoreIdentifierKey: peripheralRestoreIdentifier]
         )
+        #endif
+        
         centralManager = CBCentralManager(
             delegate: centralManagerDelegateProxy,
             queue: nil,
-            options: [
-                CBCentralManagerOptionRestoreIdentifierKey: centralRestoreIdentifier
-            ]
+            options: [CBCentralManagerOptionRestoreIdentifierKey: centralRestoreIdentifier]
         )
     }
     
@@ -448,7 +478,7 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
             let char = (service.characteristics as? [CBMutableCharacteristic])?
                 .first(where: { $0.uuid == targetCharUUID }) else {
             promise.reject(withError: NSError(domain: "MunimBluetooth", code: 3,
-                userInfo: [NSLocalizedDescriptionKey: "Characteristic \(characteristicUUID) not found in service \(serviceUUID)"]))
+                userInfo: [NSLocalizedDescriptionKey: "Characteristic \(characteristicUUID) not found"]))
             return promise
         }
         
@@ -458,8 +488,9 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
             NSLog("[MunimBluetooth] Notified subscribers on %@", characteristicUUID)
             promise.resolve(withResult: ())
         } else {
-            promise.reject(withError: NSError(domain: "MunimBluetooth", code: 4,
-                userInfo: [NSLocalizedDescriptionKey: "Transmit queue full — try again"]))
+            // Queue full — store for retry when buffer drains
+            NSLog("[MunimBluetooth] Transmit queue full — queuing for retry on %@", characteristicUUID)
+            pendingNotifications.append((data: data, char: char, promise: promise))
         }
         
         return promise
@@ -634,40 +665,10 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
             return promise
         }
         
-        // ── Peripheral role: notify subscribed centrals ────────────────────────
-        guard let peripheralManager = peripheralManager,
-            peripheralManager.state == .poweredOn else {
-            promise.reject(withError: NSError(domain: "MunimBluetooth", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Bluetooth not powered on"]))
-            return promise
-        }
-        
-        guard let data = value.data(using: .utf8) else {
-            promise.reject(withError: NSError(domain: "MunimBluetooth", code: 2,
-                userInfo: [NSLocalizedDescriptionKey: "Failed to encode value"]))
-            return promise
-        }
-        
-        let targetServiceUUID = CBUUID(string: serviceUUID)
-        let targetCharUUID    = CBUUID(string: characteristicUUID)
-        
-        guard let service = peripheralServices.first(where: { $0.uuid == targetServiceUUID }),
-            let char = (service.characteristics as? [CBMutableCharacteristic])?
-                .first(where: { $0.uuid == targetCharUUID }) else {
-            promise.reject(withError: NSError(domain: "MunimBluetooth", code: 3,
-                userInfo: [NSLocalizedDescriptionKey: "Characteristic not found"]))
-            return promise
-        }
-        
-        let didSend = peripheralManager.updateValue(data, for: char, onSubscribedCentrals: nil)
-        if didSend {
-            promise.resolve(withResult: ())
-        } else {
-            promise.reject(withError: NSError(domain: "MunimBluetooth", code: 4,
-                userInfo: [NSLocalizedDescriptionKey: "Failed to send notification — queue full"]))
-        }
-        
-        return promise
+        // ── Peripheral role: delegate to notifyCharacteristic ─────────────────
+        // notifyCharacteristic handles queue-full retry via pendingNotifications
+        NSLog("[MunimBluetooth] writeCharacteristic (peripheral role) delegating to notifyCharacteristic")
+        return try notifyCharacteristic(serviceUUID: serviceUUID, characteristicUUID: characteristicUUID, value: value)
     }
     
     func subscribeToCharacteristic(deviceId: String, serviceUUID: String, characteristicUUID: String) throws -> Promise<Void> {
@@ -992,6 +993,28 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
     }
 
     // MARK: - CoreBluetooth Delegate Forwarding
+
+    func handlePeripheralManagerIsReadyToUpdateSubscribers(_ peripheral: CBPeripheralManager) {
+        NSLog("[MunimBluetooth] Buffer drained — flushing %d pending notifications", pendingNotifications.count)
+        
+        while !pendingNotifications.isEmpty {
+            let notification = pendingNotifications.first!
+            let didSend = peripheral.updateValue(
+                notification.data,
+                for: notification.char,
+                onSubscribedCentrals: nil
+            )
+            
+            if didSend {
+                pendingNotifications.removeFirst()
+                notification.promise.resolve(withResult: ())
+            } else {
+                // Still full — stop and wait for next callback
+                NSLog("[MunimBluetooth] Buffer still full — waiting for next ready callback")
+                break
+            }
+        }
+    }
         
     func handlePeripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
         let stateStr: String
@@ -1016,23 +1039,23 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
     
     func handlePeripheralManagerDidStartAdvertising(_ peripheral: CBPeripheralManager, error: Error?) {
         if let error = error {
-            NSLog("Bluetooth event")
+            NSLog("[MunimBluetooth] Error peripheral manager starting advertising")
         } else {
-            NSLog("Bluetooth event")
+            NSLog("[MunimBluetooth] Peripheral manager starting advertising successfully")
         }
     }
     
     func handlePeripheralManagerDidAddService(_ peripheral: CBPeripheralManager, service: CBService, error: Error?) {
         if let error = error {
-            NSLog("Bluetooth event")
+            NSLog("[MunimBluetooth] Peripheral manager failed to add service")
         } else {
-            NSLog("Bluetooth event")
+            NSLog("[MunimBluetooth] Peripheral manager added service successfully")
         }
     }
     
     func handleCentralManagerDidUpdateState(_ central: CBCentralManager) {
         let state = central.state
-        NSLog("Bluetooth event")
+        NSLog("[MunimBluetooth] Central manager updated state")
     }
 
     func handleCentralManagerWillRestoreState(_ central: CBCentralManager, state: [String: Any]) {
@@ -1088,13 +1111,14 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
             for: deviceId,
             error: error ?? NSError(domain: "MunimBluetooth", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to connect to \(deviceId)"])
         )
-        NSLog("Bluetooth: connectionFailed")
+        NSLog("[MunimBluetooth]: connectionFailed")
     }
     
     func handlePeripheralDidDiscoverServices(_ peripheral: CBPeripheral, error: Error?) {
         let deviceId = peripheral.identifier.uuidString
 
         if let error = error {
+            NSLog("[MunimBluetooth]: Error in discovering services")
             pendingServiceDiscoveryPromises.removeValue(forKey: deviceId)?.reject(withError: error)
             pendingCharacteristicDiscoveryCounts.removeValue(forKey: deviceId)
             return
@@ -1116,11 +1140,14 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
         for service in services {
             peripheral.discoverCharacteristics(nil, for: service)
         }
-        
-        NSLog("Bluetooth event")
     }
     
     func handlePeripheralDidDiscoverCharacteristics(_ peripheral: CBPeripheral, service: CBService, error: Error?) {
+        if let error = error {
+            NSLog("[MunimBluetooth] Error in discovering characteristics ")
+            return
+        }
+        
         NSLog("[MunimBluetooth] characteristics discovered for %@ service %@", peripheral.identifier.uuidString, service.uuid.uuidString)
         let deviceId = peripheral.identifier.uuidString
 
@@ -1148,8 +1175,6 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
                 pendingCharacteristicDiscoveryCounts[deviceId] = nextRemaining
             }
         }
-        
-        NSLog("Bluetooth event")
     }
     
     func handlePeripheralDidUpdateValue(_ peripheral: CBPeripheral, characteristic: CBCharacteristic, error: Error?) {
@@ -1219,11 +1244,11 @@ class HybridMunimBluetooth: HybridMunimBluetoothSpec {
 
         if let error = error {
             pendingRSSIPromises.removeValue(forKey: deviceId)?.reject(withError: error)
-            NSLog("Bluetooth event")
+            NSLog("[MunimBluetooth]  Error in reading RSSI")
             return
         }
 
         pendingRSSIPromises.removeValue(forKey: deviceId)?.resolve(withResult: RSSI.doubleValue)
-        NSLog("Bluetooth event")
+        NSLog("[MunimBluetooth]  RSSI read successfully")
     }
 }

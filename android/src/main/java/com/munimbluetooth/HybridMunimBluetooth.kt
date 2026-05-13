@@ -85,6 +85,8 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
     private var onPeripheralStateChangedCallback: ((state: String) -> Unit)? = null
     private var onDeviceFoundCallback: ((device: BLEDevice) -> Unit)? = null
     private val pendingDescriptorWrites = mutableMapOf<String, Promise<Unit>>()
+    private val pendingNotifications = ArrayDeque<Triple<BluetoothGattCharacteristic, ByteArray, Promise<Unit>>>()
+    private var isNotifying = false
 
     private fun getBluetoothManager(): BluetoothManager? {
         val context = NitroModules.applicationContext ?: return null
@@ -451,7 +453,7 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         val gatt = connectedDevices[deviceId]
         if (gatt != null) {
             Log.d(TAG, "writeCharacteristic (central role): deviceId=$deviceId")
-            
+
             val characteristic = findCharacteristic(gatt, serviceUUID, characteristicUUID)
                 ?: return Promise.rejected(IllegalArgumentException(
                     "Characteristic not found: $serviceUUID/$characteristicUUID"))
@@ -476,45 +478,10 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
             return promise
         }
 
-        // ── Peripheral role: notify connected central ──────────────────────────
-        Log.d(TAG, "writeCharacteristic (peripheral role): notifying central $deviceId")
-        val server = gattServer
-            ?: return Promise.rejected(IllegalStateException("GATT server not initialized"))
-
-        val targetService = server.services
-            ?.firstOrNull { it.uuid.toString().equals(serviceUUID, ignoreCase = true) }
-            ?: return Promise.rejected(IllegalArgumentException("Service not found: $serviceUUID"))
-
-        val characteristic = targetService.characteristics
-            ?.firstOrNull { it.uuid.toString().equals(characteristicUUID, ignoreCase = true) }
-            ?: return Promise.rejected(IllegalArgumentException("Characteristic not found: $characteristicUUID"))
-
-        val data = android.util.Base64.decode(value, android.util.Base64.NO_WRAP)
-        characteristic.value = data
-
-        // Find the specific central device to notify
-        val centralDevice = bluetoothManager
-            ?.getConnectedDevices(android.bluetooth.BluetoothProfile.GATT)
-            ?.firstOrNull { it.address == deviceId }
-
-        if (centralDevice == null) {
-            // No specific device found — notify all connected centrals
-            val connectedCentrals = bluetoothManager
-                ?.getConnectedDevices(android.bluetooth.BluetoothProfile.GATT)
-                ?: emptyList()
-
-            if (connectedCentrals.isEmpty()) {
-                return Promise.rejected(IllegalStateException("No connected centrals to notify"))
-            }
-
-            connectedCentrals.forEach { device ->
-                server.notifyCharacteristicChanged(device, characteristic, false)
-            }
-        } else {
-            server.notifyCharacteristicChanged(centralDevice, characteristic, false)
-        }
-
-        return Promise.resolved(Unit)
+        // ── Peripheral role: delegate to notifyCharacteristic ─────────────────
+        // notifyCharacteristic handles queueing via onNotificationSent
+        Log.d(TAG, "writeCharacteristic (peripheral role): delegating to notifyCharacteristic")
+        return notifyCharacteristic(serviceUUID, characteristicUUID, value)
     }
 
     override fun subscribeToCharacteristic(
@@ -575,6 +542,27 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         if (!result) {
             pendingDescriptorWrites.remove(key)
             return Promise.rejected(IllegalStateException("Failed to write CCCD descriptor"))
+        }
+        return promise
+    }
+
+    override fun getConnectedDevices(): Promise<Array<String>> {
+        return Promise.resolved(connectedDevices.keys.toTypedArray())
+    }
+
+    override fun readRSSI(deviceId: String): Promise<Double> {
+        val gatt = connectedDevices[deviceId]
+            ?: return Promise.rejected(IllegalStateException("Device not connected: $deviceId"))
+
+        lastRssiValues[deviceId]?.let { cachedRssi ->
+            return Promise.resolved(cachedRssi)
+        }
+
+        val promise = Promise<Double>()
+        pendingRssiReads[deviceId] = promise
+        if (!gatt.readRemoteRssi()) {
+            pendingRssiReads.remove(deviceId)
+            return Promise.rejected(IllegalStateException("Failed to start RSSI read"))
         }
         return promise
     }
@@ -688,21 +676,40 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
             ?: return Promise.rejected(IllegalArgumentException("Characteristic not found: $characteristicUUID"))
 
         val data = value.toByteArray(Charsets.UTF_8)
-        characteristic.value = data
+        val promise = Promise<Unit>()
+
+        pendingNotifications.addLast(Triple(characteristic, data, promise))
+        drainNotificationQueue()
+
+        return promise
+    }
+
+    private fun drainNotificationQueue() {
+        if (isNotifying) return
+        val server = gattServer ?: return
 
         val connectedCentrals = bluetoothManager
             ?.getConnectedDevices(android.bluetooth.BluetoothProfile.GATT)
             ?: emptyList()
 
         if (connectedCentrals.isEmpty()) {
-            return Promise.rejected(IllegalStateException("No connected centrals to notify"))
+            // Reject all pending
+            while (pendingNotifications.isNotEmpty()) {
+                pendingNotifications.removeFirst().third.reject(
+                    IllegalStateException("No connected centrals")
+                )
+            }
+            return
         }
+
+        val next = pendingNotifications.firstOrNull() ?: return
+
+        next.first.value = next.second
+        isNotifying = true
 
         connectedCentrals.forEach { device ->
-            server.notifyCharacteristicChanged(device, characteristic, false)
+            server.notifyCharacteristicChanged(device, next.first, false)
         }
-
-        return Promise.resolved(Unit)
     }
 
     private fun restartAdvertising(delayMs: Long) {
@@ -763,6 +770,27 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
 
     private fun buildGattServerCallback(): BluetoothGattServerCallback {
         return object : BluetoothGattServerCallback() {
+
+            override fun onNotificationSent(device: BluetoothDevice, status: Int) {
+                val notification = pendingNotifications.firstOrNull() ?: return
+                pendingNotifications.removeFirst()
+                isNotifying = false
+
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    notification.third.resolve(Unit)
+                } else {
+                    Log.w(TAG, "onNotificationSent failed status=$status")
+                    notification.third.reject(
+                        IllegalStateException("Notification failed status=$status")
+                    )
+                }
+
+                // Send next queued notification
+                bluetoothScope.launch {
+                    drainNotificationQueue()
+                }
+            }
+
             override fun onCharacteristicReadRequest(
                 device: BluetoothDevice,
                 requestId: Int,
@@ -794,7 +822,6 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
                     gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, null)
                 }
 
-                // Fire callback so JS layer receives the write
                 val text = android.util.Base64.encodeToString(data, android.util.Base64.NO_WRAP)
                 onCharacteristicValueChangedCallback?.invoke(
                     device.address,
