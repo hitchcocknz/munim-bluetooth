@@ -76,7 +76,6 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
     private val pendingRssiReads = mutableMapOf<String, Promise<Double>>()
     private val lastCharacteristicValues = mutableMapOf<String, CharacteristicValue>()
     private val lastRssiValues = mutableMapOf<String, Double>()
-    // private val eventEmitter = NitroEventEmitter(TAG)
     private var nextPermissionRequestCode = BLUETOOTH_PERMISSION_REQUEST_CODE
 
     private var onDeviceConnectedCallback: ((deviceId: String) -> Unit)? = null
@@ -140,6 +139,15 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
             return
         }
 
+        // Warn if GATT server hasn't been set up via setServices() yet.
+        // setServicesFromOptions() has been removed — callers must call setServices()
+        // from JS before startAdvertising() to ensure the full GATT server callback
+        // (including onCharacteristicWriteRequest, onNotificationSent) is registered.
+        if (!gattServerReady) {
+            Log.w(TAG, "startAdvertising called but GATT server not ready — " +
+                "call setServices() from JS before startAdvertising()")
+        }
+
         currentServiceUUIDs = options.serviceUUIDs
         currentLocalName = options.localName
         currentManufacturerData = options.manufacturerData
@@ -165,10 +173,7 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
             }
         }
 
-        if (!gattServerReady) {
-            setServicesFromOptions(options.serviceUUIDs)
-        }
-        restartAdvertising(delayMs = 300L)
+        restartAdvertising(delayMs = 600L)
     }
 
     override fun updateAdvertisingData(advertisingData: AdvertisingDataTypes) {
@@ -200,9 +205,26 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         restoreAdapterName()
     }
 
+    // ── GATT server setup — sole entry point ──────────────────────────────────
+    // setServices() is the only place that opens the GattServer and registers
+    // the full callback. It must be called from JS (via BLEService.init()) before
+    // startAdvertising(). Never call openGattServer() from anywhere else.
     override fun setServices(services: Array<GATTService>) {
         if (!ensureBluetoothPermissions("set GATT services")) {
             return
+        }
+
+        // Clear any stale bonding state from previously connected centrals
+        // to prevent iOS CBError code 14 on reconnect after app reinstall
+        try {
+            val bondedDevices = bluetoothAdapter?.bondedDevices ?: emptySet()
+            for (device in bondedDevices) {
+                val removeBond = device.javaClass.getMethod("removeBond")
+                removeBond.invoke(device)
+                Log.d(TAG, "setServices: removed stale bond for ${device.address}")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "setServices: could not remove bonds", e)
         }
 
         ensureBluetoothManager()
@@ -211,6 +233,7 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         val manager = bluetoothManager ?: return
         val context = NitroModules.applicationContext ?: return
 
+        // Close any existing server cleanly before opening a new one
         gattServer?.close()
         gattServer = manager.openGattServer(context, buildGattServerCallback())
         gattServer?.clearServices()
@@ -222,15 +245,33 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
             )
 
             for (characteristicData in serviceData.characteristics) {
+                val properties = propertiesFromArray(characteristicData.properties)
+
                 val characteristic = BluetoothGattCharacteristic(
                     UUID.fromString(characteristicData.uuid),
-                    propertiesFromArray(characteristicData.properties),
+                    properties,
                     BluetoothGattCharacteristic.PERMISSION_READ or
                         BluetoothGattCharacteristic.PERMISSION_WRITE
                 )
+
+                // iOS requires an explicit CCCD descriptor on notify/indicate
+                // characteristics to allow setNotifyValue — Android does not
+                // add this automatically, causing "attribute not found" on iOS central
+                if (properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0 ||
+                    properties and BluetoothGattCharacteristic.PROPERTY_INDICATE != 0) {
+                    val cccd = BluetoothGattDescriptor(
+                        CLIENT_CHARACTERISTIC_CONFIG_UUID,
+                        BluetoothGattDescriptor.PERMISSION_READ or
+                            BluetoothGattDescriptor.PERMISSION_WRITE
+                    )
+                    characteristic.addDescriptor(cccd)
+                    Log.d(TAG, "setServices: added CCCD to notify characteristic ${characteristicData.uuid}")
+                }
+
                 characteristicData.value?.let { value ->
                     characteristic.value = hexStringToByteArray(value) ?: value.toByteArray()
                 }
+
                 service.addCharacteristic(characteristic)
             }
 
@@ -238,6 +279,7 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         }
 
         gattServerReady = true
+        Log.d(TAG, "setServices: GATT server ready with ${services.size} service(s)")
     }
 
     override fun isBluetoothEnabled(): Promise<Boolean> {
@@ -245,7 +287,7 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         Log.d(TAG, "hasPermissions: ${hasRequiredBluetoothPermissions()}")
         Log.d(TAG, "bluetoothAdapter: $bluetoothAdapter")
         Log.d(TAG, "adapter.isEnabled: ${bluetoothAdapter?.isEnabled}")
-        
+
         if (!hasRequiredBluetoothPermissions()) {
             Log.d(TAG, "returning false - no permissions")
             return Promise.resolved(false)
@@ -259,8 +301,6 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
     override fun requestBluetoothPermission(): Promise<Boolean> {
         val context = NitroModules.applicationContext ?: return Promise.resolved(false)
         val missing = BluetoothPermissionUtils.missingPermissions(context)
-        // In bridgeless mode we can only report current state — the host app
-        // must request permissions via its own flow before calling BLE APIs.
         return Promise.resolved(missing.isEmpty())
     }
 
@@ -310,14 +350,14 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 val device = result.device
                 discoveredDevices[device.address] = device
-                onDeviceFoundCallback?.invoke(buildBLEDevice(result))  // ← replace eventEmitter.emit
+                onDeviceFoundCallback?.invoke(buildBLEDevice(result))
             }
 
             override fun onBatchScanResults(results: MutableList<ScanResult>) {
                 results.forEach { result ->
                     val device = result.device
                     discoveredDevices[device.address] = device
-                    onDeviceFoundCallback?.invoke(buildBLEDevice(result))  // ← replace eventEmitter.emit
+                    onDeviceFoundCallback?.invoke(buildBLEDevice(result))
                 }
             }
 
@@ -347,7 +387,6 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
 
         ensureBluetoothManager()
 
-        // Close any stale GATT before reconnecting
         connectedDevices.remove(deviceId)?.let { staleGatt ->
             staleGatt.disconnect()
             bluetoothScope.launch {
@@ -372,7 +411,6 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         val promise = Promise<Unit>()
         pendingConnections[deviceId] = promise
 
-        // Delay connection attempt to let BLE stack settle after previous disconnect
         bluetoothScope.launch {
             delay(300)
             val gatt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -393,7 +431,6 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
 
         val gatt = connectedDevices.remove(deviceId)
         gatt?.disconnect()
-        // Delay close to allow stack to process disconnect
         bluetoothScope.launch {
             delay(500)
             gatt?.close()
@@ -407,8 +444,6 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         val gatt = connectedDevices[deviceId]
             ?: return Promise.rejected(IllegalStateException("Device not connected: $deviceId"))
 
-        // Always rediscover — cached services can cause write failures
-        // if the GATT isn't fully ready even though services appear populated
         val promise = Promise<Array<GATTService>>()
         pendingServiceDiscoveries[deviceId] = promise
         if (!gatt.discoverServices()) {
@@ -479,7 +514,6 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         }
 
         // ── Peripheral role: delegate to notifyCharacteristic ─────────────────
-        // notifyCharacteristic handles queueing via onNotificationSent
         Log.d(TAG, "writeCharacteristic (peripheral role): delegating to notifyCharacteristic")
         return notifyCharacteristic(serviceUUID, characteristicUUID, value)
     }
@@ -579,42 +613,14 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
 
         val intent = Intent(context, MunimBluetoothBackgroundService::class.java).apply {
             action = MunimBluetoothBackgroundService.ACTION_START
-            putExtra(
-                MunimBluetoothBackgroundService.EXTRA_SERVICE_UUIDS,
-                options.serviceUUIDs
-            )
-            putExtra(
-                MunimBluetoothBackgroundService.EXTRA_LOCAL_NAME,
-                options.localName
-            )
-            putExtra(
-                MunimBluetoothBackgroundService.EXTRA_ALLOW_DUPLICATES,
-                options.allowDuplicates ?: false
-            )
-            putExtra(
-                MunimBluetoothBackgroundService.EXTRA_SCAN_MODE,
-                options.scanMode?.name ?: ScanMode.LOWPOWER.name
-            )
-            putExtra(
-                MunimBluetoothBackgroundService.EXTRA_NOTIFICATION_CHANNEL_ID,
-                options.androidNotificationChannelId
-                    ?: MunimBluetoothBackgroundService.DEFAULT_CHANNEL_ID
-            )
-            putExtra(
-                MunimBluetoothBackgroundService.EXTRA_NOTIFICATION_CHANNEL_NAME,
-                options.androidNotificationChannelName
-                    ?: MunimBluetoothBackgroundService.DEFAULT_CHANNEL_NAME
-            )
-            putExtra(
-                MunimBluetoothBackgroundService.EXTRA_NOTIFICATION_TITLE,
-                options.androidNotificationTitle
-                    ?: MunimBluetoothBackgroundService.DEFAULT_NOTIFICATION_TITLE
-            )
-            putExtra(
-                MunimBluetoothBackgroundService.EXTRA_NOTIFICATION_TEXT,
-                options.androidNotificationText
-                    ?: MunimBluetoothBackgroundService.DEFAULT_NOTIFICATION_TEXT
-            )
+            putExtra(MunimBluetoothBackgroundService.EXTRA_SERVICE_UUIDS, options.serviceUUIDs)
+            putExtra(MunimBluetoothBackgroundService.EXTRA_LOCAL_NAME, options.localName)
+            putExtra(MunimBluetoothBackgroundService.EXTRA_ALLOW_DUPLICATES, options.allowDuplicates ?: false)
+            putExtra(MunimBluetoothBackgroundService.EXTRA_SCAN_MODE, options.scanMode?.name ?: ScanMode.LOWPOWER.name)
+            putExtra(MunimBluetoothBackgroundService.EXTRA_NOTIFICATION_CHANNEL_ID, options.androidNotificationChannelId ?: MunimBluetoothBackgroundService.DEFAULT_CHANNEL_ID)
+            putExtra(MunimBluetoothBackgroundService.EXTRA_NOTIFICATION_CHANNEL_NAME, options.androidNotificationChannelName ?: MunimBluetoothBackgroundService.DEFAULT_CHANNEL_NAME)
+            putExtra(MunimBluetoothBackgroundService.EXTRA_NOTIFICATION_TITLE, options.androidNotificationTitle ?: MunimBluetoothBackgroundService.DEFAULT_NOTIFICATION_TITLE)
+            putExtra(MunimBluetoothBackgroundService.EXTRA_NOTIFICATION_TEXT, options.androidNotificationText ?: MunimBluetoothBackgroundService.DEFAULT_NOTIFICATION_TEXT)
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -693,7 +699,6 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
             ?: emptyList()
 
         if (connectedCentrals.isEmpty()) {
-            // Reject all pending
             while (pendingNotifications.isNotEmpty()) {
                 pendingNotifications.removeFirst().third.reject(
                     IllegalStateException("No connected centrals")
@@ -785,10 +790,38 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
                     )
                 }
 
-                // Send next queued notification
                 bluetoothScope.launch {
                     drainNotificationQueue()
                 }
+            }
+
+            override fun onDescriptorWriteRequest(
+                device: BluetoothDevice,
+                requestId: Int,
+                descriptor: BluetoothGattDescriptor,
+                preparedWrite: Boolean,
+                responseNeeded: Boolean,
+                offset: Int,
+                value: ByteArray?
+            ) {
+                Log.d(TAG, "onDescriptorWriteRequest from ${device.address} on ${descriptor.uuid}")
+                descriptor.value = value
+                if (responseNeeded) {
+                    gattServer?.sendResponse(
+                        device,
+                        requestId,
+                        BluetoothGatt.GATT_SUCCESS,
+                        offset,
+                        null
+                    )
+                    Log.d(TAG, "onDescriptorWriteRequest: sent GATT_SUCCESS response")
+                }
+
+                // Fire connected callback when central subscribes to a characteristic —
+                // this is the Android equivalent of iOS handleCentralDidSubscribe,
+                // and ensures connectionState is 'connected' before the first write (HELLO) arrives
+                onDeviceConnectedCallback?.invoke(device.address)
+                Log.d(TAG, "onDescriptorWriteRequest: fired onDeviceConnectedCallback for ${device.address}")
             }
 
             override fun onCharacteristicReadRequest(
@@ -848,10 +881,8 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
                 when (newState) {
                     BluetoothProfile.STATE_CONNECTED -> {
                         connectedDevices[deviceId] = gatt
-                        // No peripheral.delegate line here — that's Swift only
                         Log.d(TAG, "Connected to $deviceId — requesting MTU 512")
                         gatt.requestMtu(512)
-                        // Don't resolve promise here — wait for onMtuChanged
                     }
 
                     BluetoothProfile.STATE_DISCONNECTED -> {
@@ -876,11 +907,9 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
             override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
                 Log.d(TAG, "MTU changed to $mtu for $deviceId (status=$status)")
                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    // MTU negotiated — now safe to resolve connection
                     pendingConnections.remove(deviceId)?.resolve(Unit)
                     onDeviceConnectedCallback?.invoke(deviceId)
                 } else {
-                    // MTU negotiation failed — resolve anyway with default MTU
                     Log.w(TAG, "MTU negotiation failed for $deviceId, using default")
                     pendingConnections.remove(deviceId)?.resolve(Unit)
                     onDeviceConnectedCallback?.invoke(deviceId)
@@ -935,15 +964,6 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
                         value.characteristicUUID,
                         value.value
                     )
-                    // eventEmitter.emit(
-                    //     "characteristicValueChanged",
-                    //     mapOf(
-                    //         "deviceId" to deviceId,
-                    //         "serviceUUID" to value.serviceUUID,
-                    //         "characteristicUUID" to value.characteristicUUID,
-                    //         "value" to value.value
-                    //     )
-                    // )
                 } else {
                     pendingReads.remove(key)?.reject(
                         IllegalStateException("Failed to read characteristic $key (status=$status)")
@@ -983,15 +1003,6 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
                     value.characteristicUUID,
                     value.value
                 )
-                // eventEmitter.emit(
-                //     "characteristicValueChanged",
-                //     mapOf(
-                //         "deviceId" to deviceId,
-                //         "serviceUUID" to value.serviceUUID,
-                //         "characteristicUUID" to value.characteristicUUID,
-                //         "value" to value.value
-                //     )
-                // )
             }
 
             override fun onReadRemoteRssi(gatt: BluetoothGatt, rssi: Int, status: Int) {
@@ -1027,7 +1038,9 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
                     GATTCharacteristic(
                         uuid = characteristic.uuid.toString(),
                         properties = propertiesToArray(characteristic.properties),
-                        value = characteristic.value?.let { android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)}
+                        value = characteristic.value?.let {
+                            android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
+                        }
                     )
                 }.toTypedArray()
             )
@@ -1036,8 +1049,8 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
 
     private fun buildCharacteristicValue(characteristic: BluetoothGattCharacteristic): CharacteristicValue {
         return CharacteristicValue(
-            value = characteristic.value?.let { 
-                android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP) 
+            value = characteristic.value?.let {
+                android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
             } ?: "",
             serviceUUID = characteristic.service.uuid.toString(),
             characteristicUUID = characteristic.uuid.toString()
@@ -1089,9 +1102,15 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         addServiceUUIDs(data.incompleteServiceUUIDs128, dataBuilder)
         addServiceUUIDs(data.completeServiceUUIDs128, dataBuilder)
 
-        if (data.shortenedLocalName != null || data.completeLocalName != null) {
+        // Prefer explicit name in data over setIncludeDeviceName which reads
+        // the adapter name at advertising start time and may be stale
+        val localName = data.shortenedLocalName ?: data.completeLocalName
+        if (localName != null) {
             dataBuilder.setIncludeDeviceName(true)
+            // The adapter name was already set to localName in startAdvertising,
+            // so setIncludeDeviceName will pick it up. No further action needed.
         }
+
         if (data.txPowerLevel != null) {
             dataBuilder.setIncludeTxPowerLevel(true)
         }
@@ -1164,9 +1183,7 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
                 "write" -> result = result or BluetoothGattCharacteristic.PROPERTY_WRITE
                 "notify" -> result = result or BluetoothGattCharacteristic.PROPERTY_NOTIFY
                 "indicate" -> result = result or BluetoothGattCharacteristic.PROPERTY_INDICATE
-                "writeWithoutResponse" -> {
-                    result = result or BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE
-                }
+                "writeWithoutResponse" -> result = result or BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE
             }
         }
         return result
@@ -1178,9 +1195,7 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         if (properties and BluetoothGattCharacteristic.PROPERTY_WRITE != 0) result += "write"
         if (properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0) result += "notify"
         if (properties and BluetoothGattCharacteristic.PROPERTY_INDICATE != 0) result += "indicate"
-        if (properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0) {
-            result += "writeWithoutResponse"
-        }
+        if (properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0) result += "writeWithoutResponse"
         return result.toTypedArray()
     }
 
@@ -1203,10 +1218,8 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
 
     private fun hexStringToByteArray(hexString: String?): ByteArray? {
         if (hexString == null) return null
-
         val cleanHex = hexString.replace(" ", "")
         if (cleanHex.length % 2 != 0) return null
-
         return try {
             ByteArray(cleanHex.length / 2).also { bytes ->
                 bytes.indices.forEach { index ->
@@ -1221,28 +1234,6 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
 
     private fun ByteArray.toHexString(): String {
         return joinToString("") { "%02x".format(it) }
-    }
-
-    private fun setServicesFromOptions(serviceUUIDs: Array<String>) {
-        ensureBluetoothManager()
-        gattServerReady = false
-
-        val manager = bluetoothManager ?: return
-        val context = NitroModules.applicationContext ?: return
-
-        gattServer?.close()
-        gattServer = manager.openGattServer(context, object : BluetoothGattServerCallback() {})
-        gattServer?.clearServices()
-
-        serviceUUIDs.forEach { uuid ->
-            val service = BluetoothGattService(
-                UUID.fromString(uuid),
-                BluetoothGattService.SERVICE_TYPE_PRIMARY
-            )
-            gattServer?.addService(service)
-        }
-
-        gattServerReady = true
     }
 
     private fun restoreAdapterName() {
@@ -1262,6 +1253,12 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
         val serviceUUIDs = record?.serviceUuids?.map { it.uuid.toString() }?.toTypedArray()
         val txPower = record?.txPowerLevel?.takeIf { it != Int.MIN_VALUE }?.toDouble()
 
+        // Prefer the local name from the advertising packet (scan record) over the
+        // cached system device name — the latter may be stale or reflect the adapter
+        // name before our custom localName was applied.
+        val advertisedName = record?.deviceName?.takeIf { it.isNotBlank() }
+            ?: result.device.name
+
         val advertisingData = AdvertisingDataTypes(
             flags = null,
             incompleteServiceUUIDs16 = null,
@@ -1271,7 +1268,7 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
             incompleteServiceUUIDs128 = null,
             completeServiceUUIDs128 = null,
             shortenedLocalName = null,
-            completeLocalName = record?.deviceName,
+            completeLocalName = advertisedName,
             txPowerLevel = txPower,
             serviceSolicitationUUIDs16 = null,
             serviceSolicitationUUIDs128 = null,
@@ -1285,7 +1282,7 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
 
         return BLEDevice(
             id = result.device.address,
-            name = result.device.name,
+            name = advertisedName,  // ← use advertised name, not cached system name
             rssi = result.rssi.toDouble(),
             advertisingData = advertisingData,
             serviceUUIDs = serviceUUIDs,
@@ -1296,69 +1293,7 @@ class HybridMunimBluetooth : HybridMunimBluetoothSpec() {
     companion object {
         private const val TAG = "HybridMunimBluetooth"
         private const val BLUETOOTH_PERMISSION_REQUEST_CODE = 9137
-        private val CLIENT_CHARACTERISTIC_CONFIG_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+        private val CLIENT_CHARACTERISTIC_CONFIG_UUID =
+            UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     }
 }
-
-// private class NitroEventEmitter(private val tag: String) {
-//     fun emit(eventName: String, payload: Map<String, Any?>) {
-//         val context = NitroModules.applicationContext
-//         if (context == null) {
-//             Log.w(tag, "Unable to emit $eventName: React context unavailable")
-//             return
-//         }
-        
-//         val writable = Arguments.createMap()
-//         payload.forEach { (key, value) ->
-//             writeValue(writable, key, value)
-//         }
-        
-//         context
-//             .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-//             .emit(eventName, writable)
-//     }
-    
-//     private fun writeValue(map: WritableMap, key: String, value: Any?) {
-//         when (value) {
-//             null -> map.putNull(key)
-//             is String -> map.putString(key, value)
-//             is Boolean -> map.putBoolean(key, value)
-//             is Int -> map.putInt(key, value)
-//             is Double -> map.putDouble(key, value)
-//             is Float -> map.putDouble(key, value.toDouble())
-//             is Long -> map.putDouble(key, value.toDouble())
-//             is Map<*, *> -> map.putMap(key, convertMap(value))
-//             is List<*> -> map.putArray(key, convertArray(value))
-//             else -> map.putString(key, value.toString())
-//         }
-//     }
-    
-//     private fun convertMap(map: Map<*, *>): WritableMap {
-//         val writable = Arguments.createMap()
-//         map.forEach { (key, value) ->
-//             if (key is String) {
-//                 writeValue(writable, key, value)
-//             }
-//         }
-//         return writable
-//     }
-    
-//     private fun convertArray(list: List<*>): WritableArray {
-//         val writable = Arguments.createArray()
-//         list.forEach { value ->
-//             when (value) {
-//                 null -> writable.pushNull()
-//                 is String -> writable.pushString(value)
-//                 is Boolean -> writable.pushBoolean(value)
-//                 is Int -> writable.pushInt(value)
-//                 is Double -> writable.pushDouble(value)
-//                 is Float -> writable.pushDouble(value.toDouble())
-//                 is Long -> writable.pushDouble(value.toDouble())
-//                 is Map<*, *> -> writable.pushMap(convertMap(value))
-//                 is List<*> -> writable.pushArray(convertArray(value))
-//                 else -> writable.pushString(value.toString())
-//             }
-//         }
-//         return writable
-//     }
-// }
