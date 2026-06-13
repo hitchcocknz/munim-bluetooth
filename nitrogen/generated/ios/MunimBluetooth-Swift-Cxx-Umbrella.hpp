@@ -16,6 +16,8 @@ namespace margelo::nitro::munimbluetooth { struct AdvertisingOptions; }
 namespace margelo::nitro::munimbluetooth { struct BLEDevice; }
 // Forward declaration of `BackgroundSessionOptions` to properly resolve imports.
 namespace margelo::nitro::munimbluetooth { struct BackgroundSessionOptions; }
+// Forward declaration of `CentralReadyEvent` to properly resolve imports.
+namespace margelo::nitro::munimbluetooth { struct CentralReadyEvent; }
 // Forward declaration of `CharacteristicValue` to properly resolve imports.
 namespace margelo::nitro::munimbluetooth { struct CharacteristicValue; }
 // Forward declaration of `GATTCharacteristic` to properly resolve imports.
@@ -38,6 +40,7 @@ namespace margelo::nitro::munimbluetooth { enum class WriteType; }
 #include "AdvertisingOptions.hpp"
 #include "BLEDevice.hpp"
 #include "BackgroundSessionOptions.hpp"
+#include "CentralReadyEvent.hpp"
 #include "CharacteristicValue.hpp"
 #include "GATTCharacteristic.hpp"
 #include "GATTService.hpp"

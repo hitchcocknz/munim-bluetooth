@@ -17,6 +17,7 @@
 
 #include "JHybridMunimBluetoothSpec.hpp"
 #include "JFunc_void.hpp"
+#include "JFunc_void_CentralReadyEvent.hpp"
 #include "JFunc_void_std__string.hpp"
 #include "JFunc_void_std__string_std__string_std__string_std__string.hpp"
 #include "JFunc_void_BLEDevice.hpp"
@@ -46,6 +47,7 @@ void registerAllNatives() {
   // Register native JNI methods
   margelo::nitro::munimbluetooth::JHybridMunimBluetoothSpec::CxxPart::registerNatives();
   margelo::nitro::munimbluetooth::JFunc_void_cxx::registerNatives();
+  margelo::nitro::munimbluetooth::JFunc_void_CentralReadyEvent_cxx::registerNatives();
   margelo::nitro::munimbluetooth::JFunc_void_std__string_cxx::registerNatives();
   margelo::nitro::munimbluetooth::JFunc_void_std__string_std__string_std__string_std__string_cxx::registerNatives();
   margelo::nitro::munimbluetooth::JFunc_void_BLEDevice_cxx::registerNatives();

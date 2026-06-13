@@ -27,6 +27,8 @@ namespace margelo::nitro::munimbluetooth { struct CharacteristicValue; }
 namespace margelo::nitro::munimbluetooth { enum class WriteType; }
 // Forward declaration of `BackgroundSessionOptions` to properly resolve imports.
 namespace margelo::nitro::munimbluetooth { struct BackgroundSessionOptions; }
+// Forward declaration of `CentralReadyEvent` to properly resolve imports.
+namespace margelo::nitro::munimbluetooth { struct CentralReadyEvent; }
 // Forward declaration of `BLEDevice` to properly resolve imports.
 namespace margelo::nitro::munimbluetooth { struct BLEDevice; }
 
@@ -35,13 +37,14 @@ namespace margelo::nitro::munimbluetooth { struct BLEDevice; }
 #include <NitroModules/Promise.hpp>
 #include "GATTService.hpp"
 #include <vector>
+#include <string>
 #include "ScanOptions.hpp"
 #include <optional>
-#include <string>
 #include "CharacteristicValue.hpp"
 #include "WriteType.hpp"
 #include "BackgroundSessionOptions.hpp"
 #include <functional>
+#include "CentralReadyEvent.hpp"
 #include "BLEDevice.hpp"
 
 namespace margelo::nitro::munimbluetooth {
@@ -80,6 +83,7 @@ namespace margelo::nitro::munimbluetooth {
       virtual std::shared_ptr<Promise<AdvertisingDataTypes>> getAdvertisingData() = 0;
       virtual void stopAdvertising() = 0;
       virtual void setServices(const std::vector<GATTService>& services) = 0;
+      virtual std::shared_ptr<Promise<void>> notifyCharacteristic(const std::string& serviceUUID, const std::string& characteristicUUID, const std::string& value) = 0;
       virtual std::shared_ptr<Promise<bool>> isBluetoothEnabled() = 0;
       virtual std::shared_ptr<Promise<bool>> requestBluetoothPermission() = 0;
       virtual void startScan(const std::optional<ScanOptions>& options) = 0;
@@ -91,16 +95,18 @@ namespace margelo::nitro::munimbluetooth {
       virtual std::shared_ptr<Promise<void>> writeCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID, const std::string& value, std::optional<WriteType> writeType) = 0;
       virtual std::shared_ptr<Promise<void>> subscribeToCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) = 0;
       virtual std::shared_ptr<Promise<void>> unsubscribeFromCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) = 0;
-      virtual std::shared_ptr<Promise<void>> notifyCharacteristic(const std::string& serviceUUID, const std::string& characteristicUUID, const std::string& value) = 0;
       virtual std::shared_ptr<Promise<std::vector<std::string>>> getConnectedDevices() = 0;
       virtual std::shared_ptr<Promise<double>> readRSSI(const std::string& deviceId) = 0;
       virtual void startBackgroundSession(const BackgroundSessionOptions& options) = 0;
       virtual void stopBackgroundSession() = 0;
-      virtual std::function<void()> onDeviceConnected(const std::function<void(const std::string& /* deviceId */)>& callback) = 0;
+      virtual void emitPeripheralReady(const std::string& deviceId) = 0;
+      virtual std::function<void()> onCentralReady(const std::function<void(const CentralReadyEvent& /* event */)>& callback) = 0;
+      virtual std::function<void()> onPeripheralReady(const std::function<void(const std::string& /* deviceId */)>& callback) = 0;
       virtual std::function<void()> onDeviceDisconnected(const std::function<void(const std::string& /* deviceId */)>& callback) = 0;
       virtual std::function<void()> onCharacteristicValueChanged(const std::function<void(const std::string& /* deviceId */, const std::string& /* serviceUUID */, const std::string& /* characteristicUUID */, const std::string& /* value */)>& callback) = 0;
       virtual std::function<void()> onPeripheralStateChanged(const std::function<void(const std::string& /* state */)>& callback) = 0;
       virtual std::function<void()> onDeviceFound(const std::function<void(const BLEDevice& /* device */)>& callback) = 0;
+      virtual std::function<void()> onDeviceConnected(const std::function<void(const std::string& /* deviceId */)>& callback) = 0;
 
     protected:
       // Hybrid Setup

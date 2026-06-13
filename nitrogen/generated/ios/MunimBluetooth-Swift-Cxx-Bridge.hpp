@@ -12,6 +12,8 @@
 namespace margelo::nitro::munimbluetooth { struct AdvertisingDataTypes; }
 // Forward declaration of `BLEDevice` to properly resolve imports.
 namespace margelo::nitro::munimbluetooth { struct BLEDevice; }
+// Forward declaration of `CentralReadyEvent` to properly resolve imports.
+namespace margelo::nitro::munimbluetooth { struct CentralReadyEvent; }
 // Forward declaration of `CharacteristicValue` to properly resolve imports.
 namespace margelo::nitro::munimbluetooth { struct CharacteristicValue; }
 // Forward declaration of `GATTCharacteristic` to properly resolve imports.
@@ -36,6 +38,7 @@ namespace MunimBluetooth { class HybridMunimBluetoothSpec_cxx; }
 // Include C++ defined types
 #include "AdvertisingDataTypes.hpp"
 #include "BLEDevice.hpp"
+#include "CentralReadyEvent.hpp"
 #include "CharacteristicValue.hpp"
 #include "GATTCharacteristic.hpp"
 #include "GATTService.hpp"
@@ -235,6 +238,40 @@ namespace margelo::nitro::munimbluetooth::bridge::swift {
     return vector;
   }
   
+  // pragma MARK: std::shared_ptr<Promise<void>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<void>>`.
+   */
+  using std__shared_ptr_Promise_void__ = std::shared_ptr<Promise<void>>;
+  inline std::shared_ptr<Promise<void>> create_std__shared_ptr_Promise_void__() noexcept {
+    return Promise<void>::create();
+  }
+  inline PromiseHolder<void> wrap_std__shared_ptr_Promise_void__(std::shared_ptr<Promise<void>> promise) noexcept {
+    return PromiseHolder<void>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void()>
+  /**
+   * Specialized version of `std::function<void()>`.
+   */
+  using Func_void = std::function<void()>;
+  /**
+   * Wrapper class for a `std::function<void()>`, this can be used from Swift.
+   */
+  class Func_void_Wrapper final {
+  public:
+    explicit Func_void_Wrapper(std::function<void()>&& func): _function(std::make_unique<std::function<void()>>(std::move(func))) {}
+    inline void call() const noexcept {
+      _function->operator()();
+    }
+  private:
+    std::unique_ptr<std::function<void()>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_Wrapper wrap_Func_void(Func_void value) noexcept {
+    return Func_void_Wrapper(std::move(value));
+  }
+  
   // pragma MARK: std::shared_ptr<Promise<bool>>
   /**
    * Specialized version of `std::shared_ptr<Promise<bool>>`.
@@ -312,40 +349,6 @@ namespace margelo::nitro::munimbluetooth::bridge::swift {
   }
   inline ScanOptions get_std__optional_ScanOptions_(const std::optional<ScanOptions>& optional) noexcept {
     return optional.value();
-  }
-  
-  // pragma MARK: std::shared_ptr<Promise<void>>
-  /**
-   * Specialized version of `std::shared_ptr<Promise<void>>`.
-   */
-  using std__shared_ptr_Promise_void__ = std::shared_ptr<Promise<void>>;
-  inline std::shared_ptr<Promise<void>> create_std__shared_ptr_Promise_void__() noexcept {
-    return Promise<void>::create();
-  }
-  inline PromiseHolder<void> wrap_std__shared_ptr_Promise_void__(std::shared_ptr<Promise<void>> promise) noexcept {
-    return PromiseHolder<void>(std::move(promise));
-  }
-  
-  // pragma MARK: std::function<void()>
-  /**
-   * Specialized version of `std::function<void()>`.
-   */
-  using Func_void = std::function<void()>;
-  /**
-   * Wrapper class for a `std::function<void()>`, this can be used from Swift.
-   */
-  class Func_void_Wrapper final {
-  public:
-    explicit Func_void_Wrapper(std::function<void()>&& func): _function(std::make_unique<std::function<void()>>(std::move(func))) {}
-    inline void call() const noexcept {
-      _function->operator()();
-    }
-  private:
-    std::unique_ptr<std::function<void()>> _function;
-  } SWIFT_NONCOPYABLE;
-  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept;
-  inline Func_void_Wrapper wrap_Func_void(Func_void value) noexcept {
-    return Func_void_Wrapper(std::move(value));
   }
   
   // pragma MARK: std::shared_ptr<Promise<std::vector<GATTService>>>
@@ -499,6 +502,28 @@ namespace margelo::nitro::munimbluetooth::bridge::swift {
     return Func_void_double_Wrapper(std::move(value));
   }
   
+  // pragma MARK: std::function<void(const CentralReadyEvent& /* event */)>
+  /**
+   * Specialized version of `std::function<void(const CentralReadyEvent&)>`.
+   */
+  using Func_void_CentralReadyEvent = std::function<void(const CentralReadyEvent& /* event */)>;
+  /**
+   * Wrapper class for a `std::function<void(const CentralReadyEvent& / * event * /)>`, this can be used from Swift.
+   */
+  class Func_void_CentralReadyEvent_Wrapper final {
+  public:
+    explicit Func_void_CentralReadyEvent_Wrapper(std::function<void(const CentralReadyEvent& /* event */)>&& func): _function(std::make_unique<std::function<void(const CentralReadyEvent& /* event */)>>(std::move(func))) {}
+    inline void call(CentralReadyEvent event) const noexcept {
+      _function->operator()(event);
+    }
+  private:
+    std::unique_ptr<std::function<void(const CentralReadyEvent& /* event */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_CentralReadyEvent create_Func_void_CentralReadyEvent(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_CentralReadyEvent_Wrapper wrap_Func_void_CentralReadyEvent(Func_void_CentralReadyEvent value) noexcept {
+    return Func_void_CentralReadyEvent_Wrapper(std::move(value));
+  }
+  
   // pragma MARK: std::function<void(const std::string& /* deviceId */)>
   /**
    * Specialized version of `std::function<void(const std::string&)>`.
@@ -595,15 +620,6 @@ namespace margelo::nitro::munimbluetooth::bridge::swift {
     return Result<std::shared_ptr<Promise<AdvertisingDataTypes>>>::withError(error);
   }
   
-  // pragma MARK: Result<std::shared_ptr<Promise<bool>>>
-  using Result_std__shared_ptr_Promise_bool___ = Result<std::shared_ptr<Promise<bool>>>;
-  inline Result_std__shared_ptr_Promise_bool___ create_Result_std__shared_ptr_Promise_bool___(const std::shared_ptr<Promise<bool>>& value) noexcept {
-    return Result<std::shared_ptr<Promise<bool>>>::withValue(value);
-  }
-  inline Result_std__shared_ptr_Promise_bool___ create_Result_std__shared_ptr_Promise_bool___(const std::exception_ptr& error) noexcept {
-    return Result<std::shared_ptr<Promise<bool>>>::withError(error);
-  }
-  
   // pragma MARK: Result<std::shared_ptr<Promise<void>>>
   using Result_std__shared_ptr_Promise_void___ = Result<std::shared_ptr<Promise<void>>>;
   inline Result_std__shared_ptr_Promise_void___ create_Result_std__shared_ptr_Promise_void___(const std::shared_ptr<Promise<void>>& value) noexcept {
@@ -611,6 +627,15 @@ namespace margelo::nitro::munimbluetooth::bridge::swift {
   }
   inline Result_std__shared_ptr_Promise_void___ create_Result_std__shared_ptr_Promise_void___(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<Promise<void>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<bool>>>
+  using Result_std__shared_ptr_Promise_bool___ = Result<std::shared_ptr<Promise<bool>>>;
+  inline Result_std__shared_ptr_Promise_bool___ create_Result_std__shared_ptr_Promise_bool___(const std::shared_ptr<Promise<bool>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<bool>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_bool___ create_Result_std__shared_ptr_Promise_bool___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<bool>>>::withError(error);
   }
   
   // pragma MARK: Result<std::shared_ptr<Promise<std::vector<GATTService>>>>

@@ -188,6 +188,25 @@ open class HybridMunimBluetoothSpec_cxx {
   }
   
   @inline(__always)
+  public final func notifyCharacteristic(serviceUUID: std.string, characteristicUUID: std.string, value: std.string) -> bridge.Result_std__shared_ptr_Promise_void___ {
+    do {
+      let __result = try self.__implementation.notifyCharacteristic(serviceUUID: String(serviceUUID), characteristicUUID: String(characteristicUUID), value: String(value))
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_void__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve() })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
   public final func isBluetoothEnabled() -> bridge.Result_std__shared_ptr_Promise_bool___ {
     do {
       let __result = try self.__implementation.isBluetoothEnabled()
@@ -379,25 +398,6 @@ open class HybridMunimBluetoothSpec_cxx {
   }
   
   @inline(__always)
-  public final func notifyCharacteristic(serviceUUID: std.string, characteristicUUID: std.string, value: std.string) -> bridge.Result_std__shared_ptr_Promise_void___ {
-    do {
-      let __result = try self.__implementation.notifyCharacteristic(serviceUUID: String(serviceUUID), characteristicUUID: String(characteristicUUID), value: String(value))
-      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
-        let __promise = bridge.create_std__shared_ptr_Promise_void__()
-        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
-        __result
-          .then({ __result in __promiseHolder.resolve() })
-          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
-        return __promise
-      }()
-      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
   public final func getConnectedDevices() -> bridge.Result_std__shared_ptr_Promise_std__vector_std__string____ {
     do {
       let __result = try self.__implementation.getConnectedDevices()
@@ -464,9 +464,40 @@ open class HybridMunimBluetoothSpec_cxx {
   }
   
   @inline(__always)
-  public final func onDeviceConnected(callback: bridge.Func_void_std__string) -> bridge.Result_std__function_void____ {
+  public final func emitPeripheralReady(deviceId: std.string) -> bridge.Result_void_ {
     do {
-      let __result = try self.__implementation.onDeviceConnected(callback: { () -> (String) -> Void in
+      try self.__implementation.emitPeripheralReady(deviceId: String(deviceId))
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func onCentralReady(callback: bridge.Func_void_CentralReadyEvent) -> bridge.Result_std__function_void____ {
+    do {
+      let __result = try self.__implementation.onCentralReady(callback: { () -> (CentralReadyEvent) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_CentralReadyEvent(callback)
+        return { (__event: CentralReadyEvent) -> Void in
+          __wrappedFunction.call(__event)
+        }
+      }())
+      let __resultCpp = { () -> bridge.Func_void in
+        let __closureWrapper = Func_void(__result)
+        return bridge.create_Func_void(__closureWrapper.toUnsafe())
+      }()
+      return bridge.create_Result_std__function_void____(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__function_void____(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func onPeripheralReady(callback: bridge.Func_void_std__string) -> bridge.Result_std__function_void____ {
+    do {
+      let __result = try self.__implementation.onPeripheralReady(callback: { () -> (String) -> Void in
         let __wrappedFunction = bridge.wrap_Func_void_std__string(callback)
         return { (__deviceId: String) -> Void in
           __wrappedFunction.call(std.string(__deviceId))
@@ -550,6 +581,26 @@ open class HybridMunimBluetoothSpec_cxx {
         let __wrappedFunction = bridge.wrap_Func_void_BLEDevice(callback)
         return { (__device: BLEDevice) -> Void in
           __wrappedFunction.call(__device)
+        }
+      }())
+      let __resultCpp = { () -> bridge.Func_void in
+        let __closureWrapper = Func_void(__result)
+        return bridge.create_Func_void(__closureWrapper.toUnsafe())
+      }()
+      return bridge.create_Result_std__function_void____(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__function_void____(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func onDeviceConnected(callback: bridge.Func_void_std__string) -> bridge.Result_std__function_void____ {
+    do {
+      let __result = try self.__implementation.onDeviceConnected(callback: { () -> (String) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_std__string(callback)
+        return { (__deviceId: String) -> Void in
+          __wrappedFunction.call(std.string(__deviceId))
         }
       }())
       let __resultCpp = { () -> bridge.Func_void in

@@ -51,6 +51,10 @@ abstract class HybridMunimBluetoothSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun notifyCharacteristic(serviceUUID: String, characteristicUUID: String, value: String): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
   abstract fun isBluetoothEnabled(): Promise<Boolean>
   
   @DoNotStrip
@@ -95,10 +99,6 @@ abstract class HybridMunimBluetoothSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
-  abstract fun notifyCharacteristic(serviceUUID: String, characteristicUUID: String, value: String): Promise<Unit>
-  
-  @DoNotStrip
-  @Keep
   abstract fun getConnectedDevices(): Promise<Array<String>>
   
   @DoNotStrip
@@ -113,12 +113,25 @@ abstract class HybridMunimBluetoothSpec: HybridObject() {
   @Keep
   abstract fun stopBackgroundSession(): Unit
   
-  abstract fun onDeviceConnected(callback: (deviceId: String) -> Unit): () -> Unit
+  @DoNotStrip
+  @Keep
+  abstract fun emitPeripheralReady(deviceId: String): Unit
+  
+  abstract fun onCentralReady(callback: (event: CentralReadyEvent) -> Unit): () -> Unit
   
   @DoNotStrip
   @Keep
-  private fun onDeviceConnected_cxx(callback: Func_void_std__string): Func_void {
-    val __result = onDeviceConnected(callback)
+  private fun onCentralReady_cxx(callback: Func_void_CentralReadyEvent): Func_void {
+    val __result = onCentralReady(callback)
+    return Func_void_java(__result)
+  }
+  
+  abstract fun onPeripheralReady(callback: (deviceId: String) -> Unit): () -> Unit
+  
+  @DoNotStrip
+  @Keep
+  private fun onPeripheralReady_cxx(callback: Func_void_std__string): Func_void {
+    val __result = onPeripheralReady(callback)
     return Func_void_java(__result)
   }
   
@@ -155,6 +168,15 @@ abstract class HybridMunimBluetoothSpec: HybridObject() {
   @Keep
   private fun onDeviceFound_cxx(callback: Func_void_BLEDevice): Func_void {
     val __result = onDeviceFound(callback)
+    return Func_void_java(__result)
+  }
+  
+  abstract fun onDeviceConnected(callback: (deviceId: String) -> Unit): () -> Unit
+  
+  @DoNotStrip
+  @Keep
+  private fun onDeviceConnected_cxx(callback: Func_void_std__string): Func_void {
+    val __result = onDeviceConnected(callback)
     return Func_void_java(__result)
   }
 

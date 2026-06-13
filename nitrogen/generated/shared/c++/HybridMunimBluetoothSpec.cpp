@@ -19,6 +19,7 @@ namespace margelo::nitro::munimbluetooth {
       prototype.registerHybridMethod("getAdvertisingData", &HybridMunimBluetoothSpec::getAdvertisingData);
       prototype.registerHybridMethod("stopAdvertising", &HybridMunimBluetoothSpec::stopAdvertising);
       prototype.registerHybridMethod("setServices", &HybridMunimBluetoothSpec::setServices);
+      prototype.registerHybridMethod("notifyCharacteristic", &HybridMunimBluetoothSpec::notifyCharacteristic);
       prototype.registerHybridMethod("isBluetoothEnabled", &HybridMunimBluetoothSpec::isBluetoothEnabled);
       prototype.registerHybridMethod("requestBluetoothPermission", &HybridMunimBluetoothSpec::requestBluetoothPermission);
       prototype.registerHybridMethod("startScan", &HybridMunimBluetoothSpec::startScan);
@@ -30,16 +31,18 @@ namespace margelo::nitro::munimbluetooth {
       prototype.registerHybridMethod("writeCharacteristic", &HybridMunimBluetoothSpec::writeCharacteristic);
       prototype.registerHybridMethod("subscribeToCharacteristic", &HybridMunimBluetoothSpec::subscribeToCharacteristic);
       prototype.registerHybridMethod("unsubscribeFromCharacteristic", &HybridMunimBluetoothSpec::unsubscribeFromCharacteristic);
-      prototype.registerHybridMethod("notifyCharacteristic", &HybridMunimBluetoothSpec::notifyCharacteristic);
       prototype.registerHybridMethod("getConnectedDevices", &HybridMunimBluetoothSpec::getConnectedDevices);
       prototype.registerHybridMethod("readRSSI", &HybridMunimBluetoothSpec::readRSSI);
       prototype.registerHybridMethod("startBackgroundSession", &HybridMunimBluetoothSpec::startBackgroundSession);
       prototype.registerHybridMethod("stopBackgroundSession", &HybridMunimBluetoothSpec::stopBackgroundSession);
-      prototype.registerHybridMethod("onDeviceConnected", &HybridMunimBluetoothSpec::onDeviceConnected);
+      prototype.registerHybridMethod("emitPeripheralReady", &HybridMunimBluetoothSpec::emitPeripheralReady);
+      prototype.registerHybridMethod("onCentralReady", &HybridMunimBluetoothSpec::onCentralReady);
+      prototype.registerHybridMethod("onPeripheralReady", &HybridMunimBluetoothSpec::onPeripheralReady);
       prototype.registerHybridMethod("onDeviceDisconnected", &HybridMunimBluetoothSpec::onDeviceDisconnected);
       prototype.registerHybridMethod("onCharacteristicValueChanged", &HybridMunimBluetoothSpec::onCharacteristicValueChanged);
       prototype.registerHybridMethod("onPeripheralStateChanged", &HybridMunimBluetoothSpec::onPeripheralStateChanged);
       prototype.registerHybridMethod("onDeviceFound", &HybridMunimBluetoothSpec::onDeviceFound);
+      prototype.registerHybridMethod("onDeviceConnected", &HybridMunimBluetoothSpec::onDeviceConnected);
     });
   }
 

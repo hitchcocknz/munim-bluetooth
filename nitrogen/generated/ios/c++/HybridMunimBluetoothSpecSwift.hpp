@@ -32,6 +32,8 @@ namespace margelo::nitro::munimbluetooth { struct CharacteristicValue; }
 namespace margelo::nitro::munimbluetooth { enum class WriteType; }
 // Forward declaration of `BackgroundSessionOptions` to properly resolve imports.
 namespace margelo::nitro::munimbluetooth { struct BackgroundSessionOptions; }
+// Forward declaration of `CentralReadyEvent` to properly resolve imports.
+namespace margelo::nitro::munimbluetooth { struct CentralReadyEvent; }
 // Forward declaration of `BLEDevice` to properly resolve imports.
 namespace margelo::nitro::munimbluetooth { struct BLEDevice; }
 
@@ -50,6 +52,7 @@ namespace margelo::nitro::munimbluetooth { struct BLEDevice; }
 #include "WriteType.hpp"
 #include "BackgroundSessionOptions.hpp"
 #include <functional>
+#include "CentralReadyEvent.hpp"
 #include "BLEDevice.hpp"
 
 #include "MunimBluetooth-Swift-Cxx-Umbrella.hpp"
@@ -134,6 +137,14 @@ namespace margelo::nitro::munimbluetooth {
         std::rethrow_exception(__result.error());
       }
     }
+    inline std::shared_ptr<Promise<void>> notifyCharacteristic(const std::string& serviceUUID, const std::string& characteristicUUID, const std::string& value) override {
+      auto __result = _swiftPart.notifyCharacteristic(serviceUUID, characteristicUUID, value);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
     inline std::shared_ptr<Promise<bool>> isBluetoothEnabled() override {
       auto __result = _swiftPart.isBluetoothEnabled();
       if (__result.hasError()) [[unlikely]] {
@@ -216,14 +227,6 @@ namespace margelo::nitro::munimbluetooth {
       auto __value = std::move(__result.value());
       return __value;
     }
-    inline std::shared_ptr<Promise<void>> notifyCharacteristic(const std::string& serviceUUID, const std::string& characteristicUUID, const std::string& value) override {
-      auto __result = _swiftPart.notifyCharacteristic(serviceUUID, characteristicUUID, value);
-      if (__result.hasError()) [[unlikely]] {
-        std::rethrow_exception(__result.error());
-      }
-      auto __value = std::move(__result.value());
-      return __value;
-    }
     inline std::shared_ptr<Promise<std::vector<std::string>>> getConnectedDevices() override {
       auto __result = _swiftPart.getConnectedDevices();
       if (__result.hasError()) [[unlikely]] {
@@ -252,8 +255,22 @@ namespace margelo::nitro::munimbluetooth {
         std::rethrow_exception(__result.error());
       }
     }
-    inline std::function<void()> onDeviceConnected(const std::function<void(const std::string& /* deviceId */)>& callback) override {
-      auto __result = _swiftPart.onDeviceConnected(callback);
+    inline void emitPeripheralReady(const std::string& deviceId) override {
+      auto __result = _swiftPart.emitPeripheralReady(deviceId);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
+    inline std::function<void()> onCentralReady(const std::function<void(const CentralReadyEvent& /* event */)>& callback) override {
+      auto __result = _swiftPart.onCentralReady(callback);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::function<void()> onPeripheralReady(const std::function<void(const std::string& /* deviceId */)>& callback) override {
+      auto __result = _swiftPart.onPeripheralReady(callback);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
@@ -286,6 +303,14 @@ namespace margelo::nitro::munimbluetooth {
     }
     inline std::function<void()> onDeviceFound(const std::function<void(const BLEDevice& /* device */)>& callback) override {
       auto __result = _swiftPart.onDeviceFound(callback);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::function<void()> onDeviceConnected(const std::function<void(const std::string& /* deviceId */)>& callback) override {
+      auto __result = _swiftPart.onDeviceConnected(callback);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

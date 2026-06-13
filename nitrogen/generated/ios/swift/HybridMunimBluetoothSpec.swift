@@ -18,6 +18,7 @@ public protocol HybridMunimBluetoothSpec_protocol: HybridObject {
   func getAdvertisingData() throws -> Promise<AdvertisingDataTypes>
   func stopAdvertising() throws -> Void
   func setServices(services: [GATTService]) throws -> Void
+  func notifyCharacteristic(serviceUUID: String, characteristicUUID: String, value: String) throws -> Promise<Void>
   func isBluetoothEnabled() throws -> Promise<Bool>
   func requestBluetoothPermission() throws -> Promise<Bool>
   func startScan(options: ScanOptions?) throws -> Void
@@ -29,16 +30,18 @@ public protocol HybridMunimBluetoothSpec_protocol: HybridObject {
   func writeCharacteristic(deviceId: String, serviceUUID: String, characteristicUUID: String, value: String, writeType: WriteType?) throws -> Promise<Void>
   func subscribeToCharacteristic(deviceId: String, serviceUUID: String, characteristicUUID: String) throws -> Promise<Void>
   func unsubscribeFromCharacteristic(deviceId: String, serviceUUID: String, characteristicUUID: String) throws -> Promise<Void>
-  func notifyCharacteristic(serviceUUID: String, characteristicUUID: String, value: String) throws -> Promise<Void>
   func getConnectedDevices() throws -> Promise<[String]>
   func readRSSI(deviceId: String) throws -> Promise<Double>
   func startBackgroundSession(options: BackgroundSessionOptions) throws -> Void
   func stopBackgroundSession() throws -> Void
-  func onDeviceConnected(callback: @escaping (_ deviceId: String) -> Void) throws -> () -> Void
+  func emitPeripheralReady(deviceId: String) throws -> Void
+  func onCentralReady(callback: @escaping (_ event: CentralReadyEvent) -> Void) throws -> () -> Void
+  func onPeripheralReady(callback: @escaping (_ deviceId: String) -> Void) throws -> () -> Void
   func onDeviceDisconnected(callback: @escaping (_ deviceId: String) -> Void) throws -> () -> Void
   func onCharacteristicValueChanged(callback: @escaping (_ deviceId: String, _ serviceUUID: String, _ characteristicUUID: String, _ value: String) -> Void) throws -> () -> Void
   func onPeripheralStateChanged(callback: @escaping (_ state: String) -> Void) throws -> () -> Void
   func onDeviceFound(callback: @escaping (_ device: BLEDevice) -> Void) throws -> () -> Void
+  func onDeviceConnected(callback: @escaping (_ deviceId: String) -> Void) throws -> () -> Void
 }
 
 public extension HybridMunimBluetoothSpec_protocol {

@@ -30,19 +30,19 @@ namespace margelo::nitro::munimbluetooth::bridge::swift {
     };
   }
   
-  // pragma MARK: std::function<void(bool /* result */)>
-  Func_void_bool create_Func_void_bool(void* NON_NULL swiftClosureWrapper) noexcept {
-    auto swiftClosure = MunimBluetooth::Func_void_bool::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)](bool result) mutable -> void {
-      swiftClosure.call(result);
-    };
-  }
-  
   // pragma MARK: std::function<void()>
   Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept {
     auto swiftClosure = MunimBluetooth::Func_void::fromUnsafe(swiftClosureWrapper);
     return [swiftClosure = std::move(swiftClosure)]() mutable -> void {
       swiftClosure.call();
+    };
+  }
+  
+  // pragma MARK: std::function<void(bool /* result */)>
+  Func_void_bool create_Func_void_bool(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = MunimBluetooth::Func_void_bool::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](bool result) mutable -> void {
+      swiftClosure.call(result);
     };
   }
   
@@ -75,6 +75,14 @@ namespace margelo::nitro::munimbluetooth::bridge::swift {
     auto swiftClosure = MunimBluetooth::Func_void_double::fromUnsafe(swiftClosureWrapper);
     return [swiftClosure = std::move(swiftClosure)](double result) mutable -> void {
       swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const CentralReadyEvent& /* event */)>
+  Func_void_CentralReadyEvent create_Func_void_CentralReadyEvent(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = MunimBluetooth::Func_void_CentralReadyEvent::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const CentralReadyEvent& event) mutable -> void {
+      swiftClosure.call(event);
     };
   }
   

@@ -59,6 +59,7 @@ namespace margelo::nitro::munimbluetooth {
     std::shared_ptr<Promise<AdvertisingDataTypes>> getAdvertisingData() override;
     void stopAdvertising() override;
     void setServices(const std::vector<GATTService>& services) override;
+    std::shared_ptr<Promise<void>> notifyCharacteristic(const std::string& serviceUUID, const std::string& characteristicUUID, const std::string& value) override;
     std::shared_ptr<Promise<bool>> isBluetoothEnabled() override;
     std::shared_ptr<Promise<bool>> requestBluetoothPermission() override;
     void startScan(const std::optional<ScanOptions>& options) override;
@@ -70,16 +71,18 @@ namespace margelo::nitro::munimbluetooth {
     std::shared_ptr<Promise<void>> writeCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID, const std::string& value, std::optional<WriteType> writeType) override;
     std::shared_ptr<Promise<void>> subscribeToCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) override;
     std::shared_ptr<Promise<void>> unsubscribeFromCharacteristic(const std::string& deviceId, const std::string& serviceUUID, const std::string& characteristicUUID) override;
-    std::shared_ptr<Promise<void>> notifyCharacteristic(const std::string& serviceUUID, const std::string& characteristicUUID, const std::string& value) override;
     std::shared_ptr<Promise<std::vector<std::string>>> getConnectedDevices() override;
     std::shared_ptr<Promise<double>> readRSSI(const std::string& deviceId) override;
     void startBackgroundSession(const BackgroundSessionOptions& options) override;
     void stopBackgroundSession() override;
-    std::function<void()> onDeviceConnected(const std::function<void(const std::string& /* deviceId */)>& callback) override;
+    void emitPeripheralReady(const std::string& deviceId) override;
+    std::function<void()> onCentralReady(const std::function<void(const CentralReadyEvent& /* event */)>& callback) override;
+    std::function<void()> onPeripheralReady(const std::function<void(const std::string& /* deviceId */)>& callback) override;
     std::function<void()> onDeviceDisconnected(const std::function<void(const std::string& /* deviceId */)>& callback) override;
     std::function<void()> onCharacteristicValueChanged(const std::function<void(const std::string& /* deviceId */, const std::string& /* serviceUUID */, const std::string& /* characteristicUUID */, const std::string& /* value */)>& callback) override;
     std::function<void()> onPeripheralStateChanged(const std::function<void(const std::string& /* state */)>& callback) override;
     std::function<void()> onDeviceFound(const std::function<void(const BLEDevice& /* device */)>& callback) override;
+    std::function<void()> onDeviceConnected(const std::function<void(const std::string& /* deviceId */)>& callback) override;
 
   private:
     jni::global_ref<JHybridMunimBluetoothSpec::JavaPart> _javaPart;
